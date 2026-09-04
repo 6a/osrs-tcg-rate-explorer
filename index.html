@@ -165,6 +165,38 @@
     text-align: center; color: var(--rl-muted); font-size: .75rem;
     border-top: 1px solid var(--panel-border); padding: .5rem; margin-top: 1rem;
   }
+  .faq-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.35rem; height: 1.35rem; margin-left: .5rem; vertical-align: middle;
+    background: var(--control-face); color: var(--rl-highlight);
+    border: 1px solid var(--rl-control-border); cursor: pointer;
+    font: 700 .85rem var(--font-ui); border-radius: 0;
+  }
+  .faq-btn:hover { background: var(--control-face-hover); border-color: var(--rl-select); }
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 90; background: #000000a6;
+    display: flex; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  .modal {
+    --ch: var(--panel-chamfer);
+    background: color-mix(in srgb, var(--page-mid) 97%, transparent);
+    border: 1px solid var(--panel-border); box-shadow: 0 20px 50px #000000c0;
+    max-width: 680px; width: 100%; max-height: 82vh; overflow: auto;
+    padding: 1rem 1.25rem 1.25rem;
+  }
+  .modal__head {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--panel-border); padding-bottom: .5rem;
+  }
+  .modal h2 { margin: 0; font-size: 1.05rem; color: var(--rl-highlight); }
+  .modal h3 { font-size: .88rem; margin: 1.1rem 0 .25rem; color: var(--rl-select); }
+  .modal p { margin: 0 0 .35rem; font-size: .82rem; color: var(--rl-light-gray); }
+  .modal__close {
+    background: none; border: 1px solid var(--rl-control-border); color: var(--rl-muted);
+    cursor: pointer; font: 600 .8rem var(--font-ui); padding: .15rem .5rem; border-radius: 0;
+  }
+  .modal__close:hover { color: #fff; background: var(--control-face-hover); }
 </style>
 </head>
 <body>
@@ -175,7 +207,7 @@
 <div class="main">
   <div class="panel chamfer">
     <div class="panel__titlebar">
-      <h1 class="panel__title">Card pull rates</h1>
+      <h1 class="panel__title">Card pull rates<button class="faq-btn" id="faq-btn" type="button" title="About / FAQ" aria-label="About / FAQ">?</button></h1>
       <div class="panel__sub" id="sub"></div>
     </div>
     <div class="stats" id="stats"></div>
@@ -205,6 +237,29 @@
   </div>
 </div>
 <div id="preview" class="chamfer-sm"><img alt=""></div>
+<div id="faq" class="modal-backdrop" hidden>
+  <div class="modal chamfer">
+    <div class="modal__head">
+      <h2>Card pull rates &mdash; About / FAQ</h2>
+      <button class="modal__close" id="faq-close" type="button">✕ close</button>
+    </div>
+    <h3>Using the controls</h3>
+    <p><b>Search</b> filters cards by name. The <b>Tiers / Collections / Type</b> dropdowns are multi-selects: click options to toggle them (each shows how many cards match). Clicking a card's tier chip in the table also filters to that tier.</p>
+    <p><b>Sorting:</b> click a column header to sort by it, click again to flip the direction (▲/▼). <b>Shift-click</b> another column to sort by that column as well &mdash; the small numbers next to the arrows show the sort order (¹ = primary, ² = secondary, and so on). Shift-clicking an already-sorted column flips its direction. A plain click on any header resets back to a single-column sort. Your sort config is remembered between visits.</p>
+    <p>Hover a card's art for about a second to see a larger preview.</p>
+    <h3>Where the data comes from</h3>
+    <p>All stats are based on <b>publicly available data</b> from the osrs-tcg.net public API (card catalog + circulation figures). Only <b>overall values</b> per card are published &mdash; pulls and copies-in-existence are not broken down per collection, so this site cannot show per-collection stats. Collections are listed per card, but the stats themselves are global.</p>
+    <h3>How accurate are the numbers?</h3>
+    <p>The stats are a reflection of the <b>publicly available live data</b>, which may differ from the actual server-side values (the API can serve cached snapshots, and we only see what it exposes). All we have is that public reflection. That said, by the <b>law of large numbers</b> the relative stats &mdash; pull rate %, 1-in-X &mdash; should become more accurate over time as the total number of recorded pulls grows.</p>
+    <h3>How the odds are calculated</h3>
+    <p><b>Pull rate %</b> = this card's total pulls (normal + foil) &divide; all card pulls, as a percentage. <b>1 in X</b> = total pulls across all cards &divide; this card's pulls &mdash; i.e. on average, roughly 1 in X pulls yields this card. These are observed frequencies from the public data, not official pack odds (which aren't published).</p>
+    <p><b>Exist</b> = copies currently in circulation (supply). <b>Pulled &minus; exist</b> compares interest vs supply: positive means the card has been pulled more often than copies currently exist (relatively scarce); negative means more copies exist than pulls, presumably due to beta collection imports.</p>
+    <h3>How this site is hosted</h3>
+    <p>An automated hourly job on a home server fetches the public API, rebuilds the dataset, and publishes everything as a static site to GitHub Pages. Nothing runs server-side when you browse, and no data about you is collected.</p>
+    <h3>A note on accuracy</h3>
+    <p>This app is roughly <b>95% vibe coded</b>, so mistakes are entirely possible. Double-check anything important against <a href="https://osrs-tcg.net/cards" target="_blank" rel="noopener">osrs-tcg.net</a>.</p>
+  </div>
+</div>
 <div class="site-footer">Unofficial fan-made data viewer · data from osrs-tcg.net public API · card art © OSRS TCG</div>
 <script src="data.js"></script>
 <script>
@@ -230,7 +285,7 @@ function saveSort() { try { localStorage.setItem('tcgSort', JSON.stringify(sortK
 const defaultDir = (k) => (k === 'name' || k === 'rarity') ? 1 : -1;
 
 document.getElementById('sub').innerHTML =
-  'Generated ' + new Date(D.generatedAt).toLocaleString() +
+  'Generated ' + new Date(D.generatedAt).toLocaleString(undefined, { timeZoneName: 'short' }) +
   ' &middot; pull rate = card pulls / all card pulls &middot; data from <a href="https://osrs-tcg.net/cards" target="_blank">osrs-tcg.net</a> &middot; hover a card\'s art to enlarge';
 
 document.getElementById('stats').innerHTML = `
@@ -529,6 +584,13 @@ document.querySelector('.tablewrap').addEventListener('scroll', () => {
   clearTimeout(previewTimer);
   preview.style.display = 'none';
 }, { passive: true });
+
+// ---- FAQ modal ----
+const faqEl = document.getElementById('faq');
+document.getElementById('faq-btn').addEventListener('click', () => { faqEl.hidden = false; });
+document.getElementById('faq-close').addEventListener('click', () => { faqEl.hidden = true; });
+faqEl.addEventListener('click', (e) => { if (e.target === faqEl) faqEl.hidden = true; });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') faqEl.hidden = true; });
 </script>
 </body>
 </html>
