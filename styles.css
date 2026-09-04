@@ -1,0 +1,308 @@
+  :root {
+    --theme-bg: #141210;
+    --page-base: #1c1a17;
+    --page-mid: #25221e;
+    --panel-base: #342e27;
+    --panel-mid: #3c352c;
+    --panel-lift: #463e34;
+    --panel-deep: #2c2721; /* official --theme-panel value */
+    --panel-border: #8c78586b;
+    --panel-chamfer: .85rem;
+    --control-chamfer: .35rem;
+    --control-face: #4e4740;
+    --control-face-hover: #5a5248;
+    --input-placeholder: #b8aea0;
+    --rl-select: #d2b36a;
+    --rl-highlight: #e8c458;
+    --rl-control-border: #8a7355;
+    --rl-text: #fff;
+    --rl-muted: #b0a899;
+    --rl-light-gray: #c8c0b4;
+    --font-ui: "IBM Plex Sans", "Segoe UI", Tahoma, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-ui); color: var(--rl-text); margin: 0; line-height: 1.35;
+    background-color: #0a0a0a;
+    -webkit-font-smoothing: antialiased;
+    /* app shell: exactly one viewport, never a page scrollbar - the table
+       scrolls internally and absorbs all leftover height */
+    height: 100vh; height: 100dvh;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  /* background as a fixed-position layer, NOT background-attachment: fixed -
+     Gecko repaints attachment:fixed backgrounds on every scroll frame (page-
+     wide freezes on Firefox); official osrs-tcg.net does exactly this
+     (position:fixed; inset:0 layer) and keeps its blur bars cheap that way */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1;
+    background-image: linear-gradient(#00000073, #00000073), url("art/background/osrs_card_pile_perspective_bg.jpg");
+    background-size: cover; background-position: center;
+  }
+  .site-chrome {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .45rem 1rem; background: color-mix(in srgb, var(--page-base) 88%, transparent);
+    border-bottom: 1px solid var(--panel-border);
+    backdrop-filter: blur(10px);
+    flex: none;
+  }
+  .logo { font-weight: 800; font-size: 1.05rem; letter-spacing: .02em; user-select: none; }
+  .logo .gold { color: var(--rl-select); }
+  .logo .white { color: #fff; }
+  .chamfer { clip-path: polygon(var(--ch) 0, calc(100% - var(--ch)) 0, 100% var(--ch), 100% calc(100% - var(--ch)), calc(100% - var(--ch)) 100%, var(--ch) 100%, 0 calc(100% - var(--ch)), 0 var(--ch)); }
+  .main {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    width: 100%; max-width: 1600px; margin: 0 auto; padding: .75rem .75rem;
+  }
+  .panel {
+    --ch: var(--panel-chamfer);
+    background: var(--panel-border);
+    border: 0;
+    box-shadow: none;
+    filter: drop-shadow(0 14px 34px #0000006b);
+    padding: 1px 0 .75rem;
+    position: relative;
+    isolation: isolate;
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+  }
+  .panel__titlebar, .stats, .controls { flex: none; }
+  /* inner fill inset by the 1px frame, with a matching smaller bevel */
+  /* inner fill inset by the 1px frame: official .ui-panel::after glass fill
+     (base color + 345deg gradient) rendered at --panel-glass-opacity .66, so
+     the page background shows through the panel like osrs-tcg.net */
+  .panel::before {
+    content: ""; position: absolute; inset: 1px; z-index: -1;
+    background-color: var(--panel-base);
+    background-image: linear-gradient(345deg, var(--panel-deep) 0%, var(--panel-base) 36%, var(--panel-mid) 70%, var(--panel-lift) 100%);
+    opacity: .46;
+    clip-path: polygon(calc(var(--panel-chamfer) - 1px) 0, calc(100% - var(--panel-chamfer) + 1px) 0, 100% calc(var(--panel-chamfer) - 1px), 100% calc(100% - var(--panel-chamfer) + 1px), calc(100% - var(--panel-chamfer) + 1px) 100%, calc(var(--panel-chamfer) - 1px) 100%, 0 calc(100% - var(--panel-chamfer) + 1px), 0 calc(var(--panel-chamfer) - 1px));
+  }
+  .panel__titlebar {
+    text-align: center; padding: .55rem .75rem; margin-bottom: .35rem;
+    border-bottom: 1px solid var(--panel-border);
+    background: color-mix(in srgb, var(--panel-mid) 80%, transparent);
+    clip-path: polygon(var(--panel-chamfer) 0, calc(100% - var(--panel-chamfer)) 0, 100% var(--panel-chamfer), 100% 100%, 0 100%, 0 var(--panel-chamfer));
+  }
+  .panel__title {
+    margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: .02em;
+    color: var(--rl-highlight); text-shadow: 0 2px 0 #00000088;
+  }
+  .panel__sub { color: var(--rl-muted); font-size: .78rem; margin-top: 2px; }
+  .panel__sub a { color: var(--rl-select); text-decoration: none; }
+  .panel__sub a:hover { text-decoration: underline; }
+  .stats { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; padding: .6rem .75rem .2rem; }
+  .stat {
+    background: var(--control-face); padding: .35rem .9rem; text-align: center;
+    border: 1px solid var(--rl-control-border);
+  }
+  .stat b { display: block; font-size: 1.05rem; color: var(--rl-highlight); font-weight: 700; }
+  .stat span { font-size: .72rem; color: var(--rl-muted); }
+  .controls { display: flex; gap: .5rem; flex-wrap: wrap; padding: .5rem .75rem .75rem; }
+  input, select, .mselect__btn {
+    background: var(--control-face); color: var(--rl-text);
+    border: 1px solid var(--rl-control-border); border-radius: 0;
+    padding: .5rem .75rem; font-size: .9rem; font-family: var(--font-ui); outline: none;
+  }
+  input { flex: 1; min-width: 220px; }
+  input::placeholder { color: var(--input-placeholder); }
+  input:focus, select:focus, .mselect__btn:focus { outline: none; }
+  select:hover { background: var(--control-face-hover); }
+  .mselect { position: relative; }
+  .mselect__btn { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: transform .06s ease-out, filter .06s ease-out; }
+  .mselect__btn:active { transform: translateY(1px); filter: brightness(.82); }
+  .mselect__btn.has-sel { border-color: var(--rl-select); color: var(--rl-highlight); }
+  /* Beveled controls, copied from the official osrs-tcg.net stylesheet
+     (.album-btn): the element itself is the border color clipped to the
+     chamfer; ::after is the fill, inset 1px with the SAME polygon (no
+     erosion math needed - the offset forms the frame). States swap CSS
+     vars only. Inputs can't have ::after, so #search gets a frame
+     wrapper exactly like official's own search field. */
+  .mselect__btn, .faq-btn, .modal__close, .stat, #preview, .search-wrap {
+    --ui-edge-color: var(--rl-control-border);
+    --ui-face: var(--control-face);
+    --ui-chamfer: var(--control-chamfer);
+    isolation: isolate;
+    position: relative;
+    background: var(--ui-edge-color);
+    border: 0;
+    clip-path: polygon(var(--ui-chamfer) 0, calc(100% - var(--ui-chamfer)) 0, 100% var(--ui-chamfer), 100% calc(100% - var(--ui-chamfer)), calc(100% - var(--ui-chamfer)) 100%, var(--ui-chamfer) 100%, 0 calc(100% - var(--ui-chamfer)), 0 var(--ui-chamfer));
+  }
+  .mselect__btn::after, .faq-btn::after, .modal__close::after, .stat::after, #preview::after, .search-wrap::after {
+    content: ""; position: absolute; inset: 1px; z-index: -1; pointer-events: none;
+    background: var(--ui-face);
+    clip-path: polygon(var(--ui-chamfer) 0, calc(100% - var(--ui-chamfer)) 0, 100% var(--ui-chamfer), 100% calc(100% - var(--ui-chamfer)), calc(100% - var(--ui-chamfer)) 100%, var(--ui-chamfer) 100%, 0 calc(100% - var(--ui-chamfer)), 0 var(--ui-chamfer));
+  }
+  #preview { --ui-face: var(--page-mid); }
+  .search-wrap { flex: 1; min-width: 220px; display: flex; }
+  #search { flex: 1; width: 100%; min-width: 0; background: transparent; border: 0; position: relative; z-index: 1; }
+  .mselect__btn:hover, .faq-btn:hover, .modal__close:hover, .search-wrap:hover { --ui-face: var(--control-face-hover); }
+  .mselect__btn.has-sel { --ui-edge-color: var(--rl-select); }
+  /* :focus-visible (not :focus): a mouse click leaves focus on the button,
+     so :focus would glue the gold "clicked" edge on after the mouse leaves.
+     Keyboard tabbing still gets the ring. */
+  .mselect__btn:focus-visible, .faq-btn:focus-visible, .modal__close:focus-visible {
+    --ui-edge-color: var(--rl-select);
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--rl-select) 55%, transparent));
+    outline: none;
+  }
+  .search-wrap:focus-within {
+    --ui-edge-color: var(--rl-select);
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--rl-select) 55%, transparent));
+  }
+  .modal-bevel {
+    --ui-edge-color: var(--panel-border);
+    --ui-chamfer: var(--panel-chamfer);
+    background: var(--ui-edge-color);
+    clip-path: polygon(var(--ui-chamfer) 0, calc(100% - var(--ui-chamfer)) 0, 100% var(--ui-chamfer), 100% calc(100% - var(--ui-chamfer)), calc(100% - var(--ui-chamfer)) 100%, var(--ui-chamfer) 100%, 0 calc(100% - var(--ui-chamfer)), 0 var(--ui-chamfer));
+    filter: drop-shadow(0 20px 50px #000000c0);
+    padding: 1px;
+    width: 100%; max-width: 680px; max-height: 82vh; display: flex;
+  }
+  /* 1s attention flash on filters restored from the last visit */
+  .mselect__btn.flash-rainbow { animation: rainbowflash 1s linear 1; }
+  @keyframes rainbowflash {
+    0%, 100% { --ui-edge-color: #ff3b3b; filter: brightness(1.4) drop-shadow(0 0 5px #ff3b3b); }
+    14% { --ui-edge-color: #ff8c1a; filter: brightness(1.2) drop-shadow(0 0 5px #ff8c1a); }
+    28% { --ui-edge-color: #ffe93b; filter: brightness(1.55) drop-shadow(0 0 5px #ffe93b); }
+    42% { --ui-edge-color: #3bdd5a; filter: brightness(1.2) drop-shadow(0 0 5px #3bdd5a); }
+    57% { --ui-edge-color: #1a9fff; filter: brightness(1.4) drop-shadow(0 0 5px #1a9fff); }
+    71% { --ui-edge-color: #3b5bff; filter: brightness(1.2) drop-shadow(0 0 5px #3b5bff); }
+    85% { --ui-edge-color: #c93bff; filter: brightness(1.55) drop-shadow(0 0 5px #c93bff); }
+  }
+  .tri { display: inline-block; width: 10px; height: 7px; margin-left: .35rem; vertical-align: baseline; }
+  .tri.up { transform: rotate(180deg); }
+  /* fixed (not absolute): the panel's bevel clip-path would cut off any menu
+     taller than the space below its button, and its drop-shadow filter would
+     capture fixed positioning - so menus live on <body> and are anchored to
+     the button rect in JS instead */
+  .mselect__menu {
+    position: fixed; top: 0; left: 0; z-index: 30;
+    min-width: 190px; max-height: 420px; overflow: auto;
+    background: var(--page-mid); border: 1px solid var(--rl-control-border);
+    box-shadow: 0 10px 26px #000000a0; padding: .25rem; display: flex; flex-direction: column;
+  }
+  .mselect__menu[hidden] { display: none; }
+  .mselect__opt {
+    display: flex; align-items: center; gap: .5rem; width: 100%; text-align: left;
+    background: none; color: var(--rl-light-gray); border: 0; cursor: pointer;
+    padding: .35rem .5rem; font-size: .84rem; font-family: var(--font-ui); white-space: nowrap;
+  }
+  .mselect__opt:hover { background: var(--control-face-hover); color: #fff; }
+  .mselect__opt .box {
+    width: 14px; height: 14px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--rl-control-border); background: #00000042; font-size: .7rem; line-height: 1;
+  }
+  .mselect__opt.is-selected { color: var(--rl-highlight); }
+  .mselect__opt.is-selected .box { background: var(--rl-select); border-color: var(--rl-select); color: #1c1a17; font-weight: 700; }
+  .mselect__count { margin-left: auto; font-size: .72rem; color: var(--rl-muted); }
+  .mselect__group { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rl-muted); padding: .4rem .5rem .1rem; }
+  .tablewrap { flex: 1; min-height: 0; overflow: auto; border-top: 1px solid var(--panel-border); scrollbar-gutter: stable; }
+  /* rows sit directly on the glass panel fill (official tables do the same -
+     their wrapper carries --panel-glass-opacity and nothing else behind them);
+     the sticky header stays solid so scrolled rows never show through */
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; background: transparent; }
+  th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  th {
+    cursor: pointer; user-select: none; color: var(--rl-muted);
+    position: sticky; top: 0; background: var(--page-mid); z-index: 2;
+    font-weight: 600; font-size: .8rem;
+  }
+  th:hover { color: var(--rl-highlight); }
+  th.num, td.num { text-align: right; }
+  td { color: var(--rl-light-gray); }
+  tr:hover td { background: color-mix(in srgb, var(--panel-lift) 55%, transparent); }
+  .cardname { display: flex; align-items: center; gap: .55rem; font-weight: 600; color: #fff; }
+  .icon-slot {
+    width: 34px; height: 34px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+    background: #00000042; border: 1px solid var(--panel-border); overflow: hidden;
+  }
+  .icon-slot img { width: 100%; height: 100%; object-fit: contain; }
+  .icon-slot.empty::after { content: "?"; color: var(--rl-muted); font-size: .8rem; }
+  a { color: var(--rl-select); text-decoration: none; }
+  a:hover { color: var(--rl-highlight); text-decoration: underline; }
+  /* official tier colors (from the osrs-tcg.net client bundle) */
+  .tname { text-shadow: 0 1px 2px #000000aa; }
+  a.tname:hover { filter: brightness(1.35); text-decoration: underline; }
+  .tname-Common { color: #FFFFFF; }
+  .tname-Uncommon { color: #2ECC71; }
+  .tname-Rare { color: #3498DB; }
+  .tname-Epic { color: #9B59B6; }
+  .tname-Legendary { color: #E74C3C; }
+  .tname-Mythic { color: #FF6EC7; }
+  .tname-Godly { color: #F2C94C; }
+  .rarity { display: inline-block; padding: .15rem .6rem; font-size: .72rem; font-weight: 700; letter-spacing: .03em; color: #fff; }
+  .kindtag { display: inline-block; margin-left: .4rem; padding: .1rem .45rem; font-size: .68rem; font-weight: 600; color: var(--rl-muted); background: #ffffff14; border: 1px solid var(--panel-border); vertical-align: middle; }
+  .fullarttag { display: inline-block; margin-left: .4rem; padding: .1rem .45rem; font-size: .68rem; font-weight: 600; color: #F2C94C; background: #F2C94C14; border: 1px solid #8a7355; vertical-align: middle; cursor: help; }
+  .rarity-chip { cursor: pointer; }
+  /* chip text uses the official tier palette (same as the name column);
+     Epic lightened from #5B2C6F for contrast, like the names */
+  .Common { background: #3f3a33; color: #FFFFFF; }
+  .Uncommon { background: #26583B; color: #2ECC71; }
+  .Rare { background: #28485D; color: #3498DB; }
+  .Epic { background: #34253B; color: #9B59B6; }
+  .Legendary { background: #612F2A; color: #E74C3C; }
+  .Mythic { background: #693A57; color: #FF6EC7; }
+  .Godly { background: #65572F; color: #F2C94C; }
+  .unknown { background: #2a2723; color: #8a857c; }
+  .chamfer-sm { --ch: var(--control-chamfer); }
+  /* beveled control frames are defined below, next to the flash rules */
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #8a7355a8; }
+  ::-webkit-scrollbar-thumb:hover { background: #d2b36ad1; }
+  #preview {
+    position: fixed; display: none; z-index: 60; pointer-events: none;
+    background: var(--page-mid); border: 1px solid var(--rl-control-border);
+    box-shadow: 0 14px 34px #000000b0; padding: 8px;
+  }
+  #preview img { display: block; width: auto; height: auto; max-width: min(70vw, 640px); max-height: 70vh; }
+  /* full-art source files run much wider than card art (730px+ vs 250px),
+     so clamp the full-art popup width to the card-art width; height follows
+     aspect automatically (70vh cap still applies) */
+  #preview.is-fullart img { max-width: 250px; }
+  .site-footer {
+    flex: none;
+    text-align: center; color: var(--rl-muted); font-size: .75rem;
+    border-top: 1px solid var(--panel-border); padding: .5rem;
+  }
+  .faq-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 1.35rem; height: 1.35rem; margin-left: .5rem; vertical-align: middle;
+    background: var(--control-face); color: var(--rl-highlight);
+    border: 1px solid var(--rl-control-border); cursor: pointer;
+    font: 700 .85rem var(--font-ui); border-radius: 0;
+  }
+  .faq-btn:hover { background: var(--control-face-hover); border-color: var(--rl-select); }
+  .modal-backdrop {
+    position: fixed; inset: 0; z-index: 90; background: #000000a6;
+    display: flex; align-items: center; justify-content: center; padding: 1rem;
+  }
+  .modal-backdrop[hidden] { display: none; }
+  .modal {
+    --ui-chamfer: var(--panel-chamfer);
+    background: color-mix(in srgb, var(--page-mid) 97%, transparent);
+    border: 0;
+    clip-path: polygon(var(--ui-chamfer) 0, calc(100% - var(--ui-chamfer)) 0, 100% var(--ui-chamfer), 100% calc(100% - var(--ui-chamfer)), calc(100% - var(--ui-chamfer)) 100%, var(--ui-chamfer) 100%, 0 calc(100% - var(--ui-chamfer)), 0 var(--ui-chamfer));
+    flex: 1; min-height: 0;
+    overflow: auto;
+    padding: 1rem 1.25rem 1.25rem;
+  }
+  .modal__head {
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--panel-border); padding-bottom: .5rem;
+  }
+  .modal h2 { margin: 0; font-size: 1.05rem; color: var(--rl-highlight); }
+  .modal h3 { font-size: .88rem; margin: 1.1rem 0 .25rem; color: var(--rl-select); }
+  .modal p { margin: 0 0 .35rem; font-size: .82rem; color: var(--rl-light-gray); }
+  .modal__close {
+    background: none; border: 1px solid var(--rl-control-border); color: var(--rl-muted);
+    cursor: pointer; font: 600 .8rem var(--font-ui); padding: .15rem .5rem; border-radius: 0;
+  }
+  .modal__close:hover { color: #fff; background: var(--control-face-hover); }
+  /* edge-color backgrounds must win over the base control backgrounds above */
+  .faq-btn, .modal__close, #preview { background: var(--ui-edge-color); border: 0; }
