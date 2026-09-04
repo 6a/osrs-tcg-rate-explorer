@@ -33,9 +33,16 @@
   body {
     font-family: var(--font-ui); color: var(--rl-text); margin: 0; line-height: 1.35;
     background-color: #0a0a0a;
-    background-image: linear-gradient(#00000073, #00000073), url("art/background/osrs_card_pile_perspective_bg.jpg");
-    background-size: cover; background-position: center; background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
+  }
+  /* background as a fixed-position layer, NOT background-attachment: fixed -
+     Gecko repaints attachment:fixed backgrounds on every scroll frame (page-
+     wide freezes on Firefox); official osrs-tcg.net does exactly this
+     (position:fixed; inset:0 layer) and keeps its blur bars cheap that way */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1;
+    background-image: linear-gradient(#00000073, #00000073), url("art/background/osrs_card_pile_perspective_bg.jpg");
+    background-size: cover; background-position: center;
   }
   .site-chrome {
     display: flex; align-items: center; justify-content: space-between;
@@ -181,14 +188,17 @@
   .mselect__group { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rl-muted); padding: .4rem .5rem .1rem; }
   .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); scrollbar-gutter: stable; }
   /* rows sit directly on the page background (like osrs-tcg.net's own lists,
-     which carry no surface behind them); the sticky header keeps a solid fill
-     (a transparent + backdrop-blur header froze the renderer on real GPUs) so
-     scrolled rows never show through the labels */
+     which carry no surface behind them); the sticky header is translucent but
+     uses plain alpha only - backdrop-filter froze Firefox (Gecko stalls
+     re-rasterizing backdrop blur over huge sticky table areas), so scrolled
+     rows stay readable via the tint plus a text shadow instead */
   table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; background: transparent; }
   th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   th {
     cursor: pointer; user-select: none; color: var(--rl-muted);
-    position: sticky; top: 0; background: var(--page-mid); z-index: 2;
+    position: sticky; top: 0; z-index: 2;
+    background: color-mix(in srgb, var(--page-mid) 68%, transparent);
+    text-shadow: 0 1px 2px #000000cc;
     font-weight: 600; font-size: .8rem;
   }
   th:hover { color: var(--rl-highlight); }
