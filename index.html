@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OSRS TCG Pull Rates</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --theme-bg: #141210;
+    --page-base: #1c1a17;
+    --page-mid: #25221e;
+    --panel-base: #342e27;
+    --panel-mid: #3c352c;
+    --panel-lift: #463e34;
+    --panel-border: #8c78586b;
+    --panel-chamfer: .85rem;
+    --control-chamfer: .35rem;
+    --control-face: #4e4740;
+    --control-face-hover: #5a5248;
+    --input-placeholder: #b8aea0;
+    --rl-select: #d2b36a;
+    --rl-highlight: #e8c458;
+    --rl-control-border: #8a7355;
+    --rl-text: #fff;
+    --rl-muted: #b0a899;
+    --rl-light-gray: #c8c0b4;
+    --font-ui: "IBM Plex Sans", "Segoe UI", Tahoma, sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: var(--font-ui); color: var(--rl-text); margin: 0; line-height: 1.35;
+    background-color: #0a0a0a;
+    background-image: linear-gradient(#00000073, #00000073), url("https://osrs-tcg.net/images/background/osrs_card_pile_perspective_bg.jpg");
+    background-size: cover; background-position: center; background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+  .site-chrome {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .45rem 1rem; background: color-mix(in srgb, var(--page-base) 88%, transparent);
+    border-bottom: 1px solid var(--panel-border);
+    position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px);
+  }
+  .logo { font-weight: 800; font-size: 1.05rem; letter-spacing: .02em; user-select: none; }
+  .logo .gold { color: var(--rl-select); }
+  .logo .white { color: #fff; }
+  .chamfer { clip-path: polygon(var(--ch) 0, calc(100% - var(--ch)) 0, 100% var(--ch), 100% calc(100% - var(--ch)), calc(100% - var(--ch)) 100%, var(--ch) 100%, 0 calc(100% - var(--ch)), 0 var(--ch)); }
+  .main { max-width: 1400px; margin: 1.25rem auto 2rem; padding: 0 .75rem; }
+  .panel {
+    --ch: var(--panel-chamfer);
+    background: color-mix(in srgb, var(--panel-base) 94%, transparent);
+    border: 1px solid var(--panel-border);
+    box-shadow: 0 14px 34px #0000006b;
+    padding: 0 0 1rem;
+  }
+  .panel__titlebar {
+    text-align: center; padding: .55rem .75rem; margin-bottom: .35rem;
+    border-bottom: 1px solid var(--panel-border);
+    background: color-mix(in srgb, var(--panel-mid) 80%, transparent);
+  }
+  .panel__title {
+    margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: .02em;
+    color: var(--rl-highlight); text-shadow: 0 2px 0 #00000088;
+  }
+  .panel__sub { color: var(--rl-muted); font-size: .78rem; margin-top: 2px; }
+  .panel__sub a { color: var(--rl-select); text-decoration: none; }
+  .panel__sub a:hover { text-decoration: underline; }
+  .stats { display: flex; gap: .6rem; flex-wrap: wrap; justify-content: center; padding: .6rem .75rem .2rem; }
+  .stat {
+    background: var(--control-face); padding: .35rem .9rem; text-align: center;
+    border: 1px solid var(--rl-control-border);
+  }
+  .stat b { display: block; font-size: 1.05rem; color: var(--rl-highlight); font-weight: 700; }
+  .stat span { font-size: .72rem; color: var(--rl-muted); }
+  .controls { display: flex; gap: .5rem; flex-wrap: wrap; padding: .5rem .75rem .75rem; }
+  input, select {
+    background: var(--control-face); color: var(--rl-text);
+    border: 1px solid var(--rl-control-border); border-radius: 0;
+    padding: .5rem .75rem; font-size: .9rem; font-family: var(--font-ui); outline: none;
+  }
+  input { flex: 1; min-width: 220px; }
+  input::placeholder { color: var(--input-placeholder); }
+  input:focus, select:focus { border-color: var(--rl-select); box-shadow: 0 0 0 1px color-mix(in srgb, var(--rl-select) 55%, transparent); }
+  select:hover { background: var(--control-face-hover); }
+  .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); }
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; }
+  th {
+    cursor: pointer; user-select: none; color: var(--rl-muted);
+    position: sticky; top: 0; background: var(--page-mid); z-index: 2;
+    font-weight: 600; font-size: .8rem;
+  }
+  th:hover { color: var(--rl-highlight); }
+  th.num, td.num { text-align: right; }
+  td { color: var(--rl-light-gray); }
+  tr:hover td { background: color-mix(in srgb, var(--panel-lift) 55%, transparent); }
+  .cardname { display: flex; align-items: center; gap: .55rem; font-weight: 600; color: #fff; }
+  .icon-slot {
+    width: 34px; height: 34px; flex: none; display: inline-flex; align-items: center; justify-content: center;
+    background: #00000042; border: 1px solid var(--panel-border); overflow: hidden;
+  }
+  .icon-slot img { width: 100%; height: 100%; object-fit: contain; }
+  .icon-slot.loading::after {
+    content: ""; width: 12px; height: 12px; border: 2px solid var(--rl-control-border);
+    border-top-color: var(--rl-select); border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  a { color: var(--rl-select); text-decoration: none; }
+  a:hover { color: var(--rl-highlight); text-decoration: underline; }
+  .rarity { display: inline-block; padding: .15rem .6rem; font-size: .72rem; font-weight: 700; letter-spacing: .03em; color: #fff; }
+  .rarity-chip { cursor: pointer; }
+  .Common { background: #3f3a33; color: #c8c0b4; }
+  .Uncommon { background: #26583B; color: #7de89f; }
+  .Rare { background: #28485D; color: #7db8e8; }
+  .Epic { background: #34253B; color: #b07de0; }
+  .Legendary { background: #612F2A; color: #e88a7d; }
+  .Mythic { background: #693A57; color: #ff9ed6; }
+  .Godly { background: #65572F; color: #e8c458; }
+  .unknown { background: #2a2723; color: #8a857c; }
+  .chamfer-sm { --ch: var(--control-chamfer); }
+  ::-webkit-scrollbar { width: 7px; height: 7px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #8a7355a8; }
+  ::-webkit-scrollbar-thumb:hover { background: #d2b36ad1; }
+  .site-footer {
+    text-align: center; color: var(--rl-muted); font-size: .75rem;
+    border-top: 1px solid var(--panel-border); padding: .5rem; margin-top: 1rem;
+  }
+</style>
+</head>
+<body>
+<div class="site-chrome">
+  <div class="logo"><span class="gold">OSRS</span><span class="white"> - TCG</span></div>
+  <div class="logo" style="font-size:.8rem;font-weight:600;color:var(--rl-muted)">Pull rates</div>
+</div>
+<div class="main">
+  <div class="panel chamfer">
+    <div class="panel__titlebar">
+      <h1 class="panel__title">Card pull rates</h1>
+      <div class="panel__sub" id="sub"></div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="controls">
+      <input id="search" type="search" placeholder="Search card name...">
+      <select id="rarity" class="chamfer-sm"><option value="">All tiers</option></select>
+      <select id="kind" class="chamfer-sm">
+        <option value="">All collections</option>
+        <option value="item">Items</option>
+        <option value="npc">NPCs</option>
+        <option value="item+npc">Items + NPCs</option>
+        <option value="unknown">Unknown</option>
+      </select>
+      <select id="sort" class="chamfer-sm">
+        <option value="pullRatePct">Pull rate ↓</option>
+        <option value="pulled">Total pulled ↓</option>
+        <option value="pulledFoil">Foil pulled ↓</option>
+        <option value="name">Name ↑</option>
+      </select>
+    </div>
+    <div class="tablewrap">
+      <table id="table">
+        <thead><tr>
+          <th data-k="name">Card</th>
+          <th data-k="rarity">Tier</th>
+          <th class="num" data-k="pulledNormal">Pulled (normal)</th>
+          <th class="num" data-k="pulledFoil">Pulled (foil)</th>
+          <th class="num" data-k="pulled">Total pulled</th>
+          <th class="num" data-k="pullRatePct">Pull rate %</th>
+          <th class="num" data-k="oneInX">1 in X</th>
+          <th class="num" data-k="existNormal">Exist (normal)</th>
+          <th class="num" data-k="existFoil">Exist (foil)</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<div class="site-footer">Unofficial fan-made data viewer · data from osrs-tcg.net public API · card art © OSRS TCG</div>
+<script src="data.js"></script>
+<script>
+const D = window.PULL_DATA;
+const tbody = document.querySelector('#table tbody');
+const searchEl = document.getElementById('search');
+const rarityEl = document.getElementById('rarity');
+const kindEl = document.getElementById('kind');
+const sortEl = document.getElementById('sort');
+let sortK = 'pullRatePct', sortDir = -1;
+
+document.getElementById('sub').innerHTML =
+  'Generated ' + new Date(D.generatedAt).toLocaleString() +
+  ' &middot; pull rate = card pulls / all card pulls &middot; data from <a href="https://osrs-tcg.net/cards" target="_blank">osrs-tcg.net</a> &middot; card art hotlinked from osrs-tcg.net (lazy-loaded, cache-shared)';
+
+document.getElementById('stats').innerHTML = `
+  <div class="stat chamfer-sm"><b>${D.cards.length.toLocaleString()}</b><span>cards</span></div>
+  <div class="stat chamfer-sm"><b>${D.totalPulled.toLocaleString()}</b><span>total card pulls</span></div>
+  <div class="stat chamfer-sm"><b>${D.cards.reduce((s,c)=>s+c.pulledFoil,0).toLocaleString()}</b><span>foil pulls</span></div>`;
+
+const rarities = [...new Set(D.cards.map(c => c.rarity).filter(Boolean))]
+  .sort((a, b) => D.cards.filter(c => c.rarity === b).length - D.cards.filter(c => c.rarity === a).length);
+for (const r of rarities) {
+  const o = document.createElement('option');
+  o.value = r; o.textContent = `${r} (${D.cards.filter(c => c.rarity === r).length})`;
+  rarityEl.appendChild(o);
+}
+
+function fmt(n) { return n == null ? '-' : n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 2 }); }
+function imgTitle(c) { return c.wiki || c.name; }
+function artSrc(c) { return c.imagePath ? 'https://osrs-tcg.net' + c.imagePath : null; }
+function artSlot(c) {
+  const src = artSrc(c);
+  return src ? `<span class="icon-slot" data-src="${escapeAttr(src)}"></span>` : '<span class="icon-slot empty"></span>';
+}
+function escapeAttr(s) { return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+function wikiUrl(c) {
+  const base = 'https://oldschool.runescape.wiki/w/';
+  return c.wiki ? base + encodeURIComponent(c.wiki.replace(/ /g, '_')) : null;
+}
+
+// Art is hotlinked from osrs-tcg.net using the exact same URLs their site
+// uses, so visitors who have browsed osrs-tcg.net reuse their browser cache,
+// and Cloudflare edge-caches everything for everyone else.
+const iconIO = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    iconIO.unobserve(e.target);
+    const src = e.target.dataset.src;
+    if (src) {
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.alt = '';
+      img.onerror = () => e.target.classList.add('empty');
+      img.src = src;
+      e.target.appendChild(img);
+    } else {
+      e.target.classList.add('empty');
+    }
+  }
+}, { root: document.querySelector('.tablewrap'), rootMargin: '600px' });
+
+function render() {
+  const q = searchEl.value.toLowerCase();
+  const rar = rarityEl.value, kind = kindEl.value;
+  let rows = D.cards.filter(c =>
+    (!q || c.name.toLowerCase().includes(q)) &&
+    (!rar || c.rarity === rar) &&
+    (!kind || c.kind === kind));
+  sortK = sortEl.value === 'name' ? 'name' : sortEl.value;
+  sortDir = sortEl.value === 'name' ? 1 : -1;
+  rows.sort((a, b) => {
+    const va = a[sortK], vb = b[sortK];
+    return (va == null ? -1 : vb == null ? 1 : va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
+  });
+  tbody.innerHTML = rows.map(c => {
+    const w = wikiUrl(c);
+    const nameHtml = w ? `<a href="${w}" target="_blank">${c.name}</a>` : c.name;
+    return `<tr>
+      <td><span class="cardname">${artSlot(c)}${nameHtml}</span></td>
+      <td>${c.rarity ? `<span class="rarity rarity-chip chamfer-sm" onclick="document.getElementById('rarity').value='${c.rarity}';render()">${c.rarity}</span>` : '<span class="rarity unknown chamfer-sm">?</span>'}</td>
+      <td class="num">${c.pulledNormal.toLocaleString()}</td>
+      <td class="num">${c.pulledFoil.toLocaleString()}</td>
+      <td class="num">${c.pulled.toLocaleString()}</td>
+      <td class="num">${fmt(c.pullRatePct)}</td>
+      <td class="num">${c.oneInX ? Math.round(c.oneInX).toLocaleString() : '-'}</td>
+      <td class="num">${c.existNormal == null ? '-' : c.existNormal.toLocaleString()}</td>
+      <td class="num">${c.existFoil == null ? '-' : c.existFoil.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('.icon-slot').forEach(el => iconIO.observe(el));
+}
+
+document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => {
+  const k = th.dataset.k;
+  if (sortK === k) sortDir = -sortDir;
+  else { sortK = k; sortDir = (k === 'name' || k === 'rarity') ? 1 : -1; }
+  render();
+}));
+searchEl.addEventListener('input', render);
+rarityEl.addEventListener('change', render);
+kindEl.addEventListener('change', render);
+render();
+</script>
+</body>
+</html>
