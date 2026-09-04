@@ -173,6 +173,7 @@
   .mselect__opt.is-selected { color: var(--rl-highlight); }
   .mselect__opt.is-selected .box { background: var(--rl-select); border-color: var(--rl-select); color: #1c1a17; font-weight: 700; }
   .mselect__count { margin-left: auto; font-size: .72rem; color: var(--rl-muted); }
+  .mselect__group { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rl-muted); padding: .4rem .5rem .1rem; }
   .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); scrollbar-gutter: stable; }
   table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; }
   th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -267,6 +268,8 @@
     cursor: pointer; font: 600 .8rem var(--font-ui); padding: .15rem .5rem; border-radius: 0;
   }
   .modal__close:hover { color: #fff; background: var(--control-face-hover); }
+  /* edge-color backgrounds must win over the base control backgrounds above */
+  .faq-btn, .modal__close, #preview { background: var(--ui-edge-color); border: 0; }
 </style>
 </head>
 <body>
@@ -286,6 +289,7 @@
       <div class="mselect" id="ms-tier"></div>
       <div class="mselect" id="ms-coll"></div>
       <div class="mselect" id="ms-type"></div>
+      <div class="mselect" id="ms-tags"></div>
       <button class="mselect__btn" id="reset-filters" type="button" title="Clear search and all filters">Reset filters</button>
     </div>
     <div class="tablewrap">
@@ -316,7 +320,7 @@
       <button class="modal__close" id="faq-close" type="button">✕ close</button>
     </div>
     <h3>Using the controls</h3>
-    <p><b>Search</b> filters cards by name. The <b>Tiers / Collections / Type</b> dropdowns are multi-selects: click options to toggle them (each shows how many cards match). Clicking a card's tier chip in the table also filters to that tier. Filters and search are remembered between visits; <b>Reset filters</b> clears everything.</p>
+    <p><b>Search</b> filters cards by name. The <b>Tiers / Collections / Type / Tags</b> dropdowns are multi-selects (Tags mirrors the tag filter on osrs-tcg.net): click options to toggle them (each shows how many cards match). Clicking a card's tier chip in the table also filters to that tier. Filters and search are remembered between visits; <b>Reset filters</b> clears everything.</p>
     <p><b>Sorting:</b> click a column header to sort by it, click again to flip the direction (▲/▼). <b>Shift-click</b> another column to sort by that column as well &mdash; the small numbers next to the arrows show the sort order (¹ = primary, ² = secondary, and so on). Shift-clicking an already-sorted column flips its direction. A plain click on any header resets back to a single-column sort. Your sort config is remembered between visits.</p>
     <p>Hover a card's art for about a second to see a larger preview.</p>
     <h3>Where the data comes from</h3>
@@ -392,21 +396,25 @@ function wikiUrl(c) {
 }
 
 // ---- multi-select filters ----
-const sel = { tier: new Set(), coll: new Set(), type: new Set() };
+const sel = { tier: new Set(), coll: new Set(), type: new Set(), tags: new Set() };
 const countBy = (fn) => { const m = {}; for (const c of D.cards) { const v = fn(c); if (v != null) m[v] = (m[v] || 0) + 1; } return m; };
 const tierCounts = countBy(c => c.rarity);
 const collCounts = {}; for (const c of D.cards) for (const v of (c.collections || [])) collCounts[v] = (collCounts[v] || 0) + 1;
+const tagCounts = {};
+for (const c of D.cards) for (const t of (c.tags || [])) tagCounts[t] = (tagCounts[t] || 0) + 1;
+const ALL_TAGS = new Set(D.tagGroups.flatMap((g) => g.tags));
 const MS_DEFS = [
   { id: 'tier', emptyLabel: 'All tiers', values: TIER_ORDER.filter(t => tierCounts[t]).map(v => ({ v, l: `${v} (${tierCounts[v]})` })) },
   { id: 'coll', emptyLabel: 'All collections', values: COLLECTIONS.filter(v => collCounts[v]).map(v => ({ v, l: `${v} (${collCounts[v]})` })) },
   { id: 'type', emptyLabel: 'All types', values: [{ v: 'item', l: 'Item' }, { v: 'npc', l: 'NPC' }] },
+  { id: 'tags', emptyLabel: 'All tags', groups: D.tagGroups.map((g) => ({ label: g.label, values: g.tags.filter((t) => tagCounts[t]).map((v) => ({ v, l: `${v} (${tagCounts[v]})` })) })).filter((g) => g.values.length) },
 ];
 // ---- persisted filters: search + dropdowns are remembered between visits ----
 const FILTER_KEY = 'tcgFilters';
 function saveFilters() {
   try {
     localStorage.setItem(FILTER_KEY, JSON.stringify({
-      tier: [...sel.tier], coll: [...sel.coll], type: [...sel.type], q: searchEl.value,
+      tier: [...sel.tier], coll: [...sel.coll], type: [...sel.type], tags: [...sel.tags], q: searchEl.value,
     }));
   } catch {}
 }
@@ -417,6 +425,7 @@ function loadFilters() {
   if (Array.isArray(f.tier)) for (const v of f.tier) if (TIER_ORDER.includes(v)) sel.tier.add(v);
   if (Array.isArray(f.coll)) for (const v of f.coll) if (COLLECTIONS.includes(v)) sel.coll.add(v);
   if (Array.isArray(f.type)) for (const v of f.type) if (v === 'item' || v === 'npc') sel.type.add(v);
+  if (Array.isArray(f.tags)) for (const v of f.tags) if (ALL_TAGS.has(v)) sel.tags.add(v);
   if (typeof f.q === 'string') searchEl.value = f.q;
 }
 loadFilters();
@@ -427,7 +436,14 @@ for (const def of MS_DEFS) {
   btn.type = 'button'; btn.className = 'mselect__btn';
   const menu = document.createElement('div');
   menu.className = 'mselect__menu'; menu.hidden = true;
-  for (const { v, l } of def.values) {
+  for (const sec of (def.groups || [{ values: def.values }])) {
+    if (sec.label) {
+      const h = document.createElement('div');
+      h.className = 'mselect__group';
+      h.textContent = sec.label;
+      menu.appendChild(h);
+    }
+    for (const { v, l } of sec.values) {
     const opt = document.createElement('button');
     opt.type = 'button'; opt.className = 'mselect__opt'; opt.dataset.v = v;
     opt.innerHTML = `<span class="box"></span><span>${escapeAttr(l)}</span>`;
@@ -438,6 +454,7 @@ for (const def of MS_DEFS) {
       render();
     });
     menu.appendChild(opt);
+    }
   }
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -448,13 +465,18 @@ for (const def of MS_DEFS) {
   msEls[def.id] = { btn, menu };
   syncMS(def.id);
 }
+function msLabel(def, v) {
+  const all = def.groups ? def.groups.flatMap((g) => g.values) : def.values;
+  const hit = all.find((x) => x.v === v);
+  return hit ? hit.l : v;
+}
 function syncMS(id) {
   const def = MS_DEFS.find(d => d.id === id);
   const chosen = sel[id];
   const { btn, menu } = msEls[id];
   btn.classList.toggle('has-sel', chosen.size > 0);
   btn.innerHTML = chosen.size === 0 ? `${def.emptyLabel} <span class="caret">▾</span>`
-    : chosen.size === 1 ? `${def.values.find(x => x.v === [...chosen][0]).l} <span class="caret">▾</span>`
+    : chosen.size === 1 ? `${msLabel(def, [...chosen][0])} <span class="caret">▾</span>`
     : `${def.emptyLabel}: ${chosen.size} selected <span class="caret">▾</span>`;
   for (const opt of menu.children) opt.classList.toggle('is-selected', chosen.has(opt.dataset.v));
 }
@@ -560,6 +582,7 @@ function applyFilter() {
       if (!types.some(t => sel.type.has(t))) return false;
     }
     if (sel.coll.size && !(c.collections || []).some(x => sel.coll.has(x))) return false;
+    if (sel.tags.size && !(c.tags || []).some((t) => sel.tags.has(t))) return false;
     return true;
   });
   filtered.sort((a, b) => {
@@ -669,7 +692,7 @@ for (const def of MS_DEFS) {
 
 // reset button: clear search + all filters
 document.getElementById('reset-filters').addEventListener('click', () => {
-  sel.tier.clear(); sel.coll.clear(); sel.type.clear();
+  sel.tier.clear(); sel.coll.clear(); sel.type.clear(); sel.tags.clear();
   searchEl.value = '';
   for (const def of MS_DEFS) syncMS(def.id);
   render();
