@@ -14,6 +14,7 @@
     --panel-base: #342e27;
     --panel-mid: #3c352c;
     --panel-lift: #463e34;
+    --panel-deep: #2c2721; /* official --theme-panel value */
     --panel-border: #8c78586b;
     --panel-chamfer: .85rem;
     --control-chamfer: .35rem;
@@ -66,9 +67,14 @@
     isolation: isolate;
   }
   /* inner fill inset by the 1px frame, with a matching smaller bevel */
+  /* inner fill inset by the 1px frame: official .ui-panel::after glass fill
+     (base color + 345deg gradient) rendered at --panel-glass-opacity .66, so
+     the page background shows through the panel like osrs-tcg.net */
   .panel::before {
     content: ""; position: absolute; inset: 1px; z-index: -1;
-    background: color-mix(in srgb, var(--panel-base) 94%, transparent);
+    background-color: var(--panel-base);
+    background-image: linear-gradient(345deg, var(--panel-deep) 0%, var(--panel-base) 36%, var(--panel-mid) 70%, var(--panel-lift) 100%);
+    opacity: .66;
     clip-path: polygon(calc(var(--panel-chamfer) - 1px) 0, calc(100% - var(--panel-chamfer) + 1px) 0, 100% calc(var(--panel-chamfer) - 1px), 100% calc(100% - var(--panel-chamfer) + 1px), calc(100% - var(--panel-chamfer) + 1px) 100%, calc(var(--panel-chamfer) - 1px) 100%, 0 calc(100% - var(--panel-chamfer) + 1px), 0 calc(var(--panel-chamfer) - 1px));
   }
   .panel__titlebar {
@@ -187,18 +193,14 @@
   .mselect__count { margin-left: auto; font-size: .72rem; color: var(--rl-muted); }
   .mselect__group { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rl-muted); padding: .4rem .5rem .1rem; }
   .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); scrollbar-gutter: stable; }
-  /* rows sit directly on the page background (like osrs-tcg.net's own lists,
-     which carry no surface behind them); the sticky header is translucent but
-     uses plain alpha only - backdrop-filter froze Firefox (Gecko stalls
-     re-rasterizing backdrop blur over huge sticky table areas), so scrolled
-     rows stay readable via the tint plus a text shadow instead */
+  /* rows sit directly on the glass panel fill (official tables do the same -
+     their wrapper carries --panel-glass-opacity and nothing else behind them);
+     the sticky header stays solid so scrolled rows never show through */
   table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; background: transparent; }
   th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   th {
     cursor: pointer; user-select: none; color: var(--rl-muted);
-    position: sticky; top: 0; z-index: 2;
-    background: color-mix(in srgb, var(--page-mid) 68%, transparent);
-    text-shadow: 0 1px 2px #000000cc;
+    position: sticky; top: 0; background: var(--page-mid); z-index: 2;
     font-weight: 600; font-size: .8rem;
   }
   th:hover { color: var(--rl-highlight); }
