@@ -87,6 +87,17 @@
   .mselect { position: relative; }
   .mselect__btn { cursor: pointer; white-space: nowrap; }
   .mselect__btn.has-sel { border-color: var(--rl-select); color: var(--rl-highlight); }
+  /* 1s attention flash on filters restored from the last visit */
+  .mselect__btn.flash-rainbow { animation: rainbowflash 1s linear 1; }
+  @keyframes rainbowflash {
+    0%, 100% { border-color: #ff3b3b; filter: brightness(1.4); }
+    14% { border-color: #ff8c1a; }
+    28% { border-color: #ffe93b; filter: brightness(1.55); }
+    42% { border-color: #3bdd5a; }
+    57% { border-color: #1a9fff; filter: brightness(1.4); }
+    71% { border-color: #3b5bff; }
+    85% { border-color: #c93bff; filter: brightness(1.55); }
+  }
   .mselect__btn .caret { font-size: .7rem; margin-left: .4rem; }
   .mselect__menu {
     position: absolute; top: calc(100% + 4px); left: 0; z-index: 30;
@@ -142,13 +153,15 @@
   .rarity { display: inline-block; padding: .15rem .6rem; font-size: .72rem; font-weight: 700; letter-spacing: .03em; color: #fff; }
   .kindtag { display: inline-block; margin-left: .4rem; padding: .1rem .45rem; font-size: .68rem; font-weight: 600; color: var(--rl-muted); background: #ffffff14; border: 1px solid var(--panel-border); vertical-align: middle; }
   .rarity-chip { cursor: pointer; }
-  .Common { background: #3f3a33; color: #c8c0b4; }
-  .Uncommon { background: #26583B; color: #7de89f; }
-  .Rare { background: #28485D; color: #7db8e8; }
-  .Epic { background: #34253B; color: #b07de0; }
-  .Legendary { background: #612F2A; color: #e88a7d; }
-  .Mythic { background: #693A57; color: #ff9ed6; }
-  .Godly { background: #65572F; color: #e8c458; }
+  /* chip text uses the official tier palette (same as the name column);
+     Epic lightened from #5B2C6F for contrast, like the names */
+  .Common { background: #3f3a33; color: #FFFFFF; }
+  .Uncommon { background: #26583B; color: #2ECC71; }
+  .Rare { background: #28485D; color: #3498DB; }
+  .Epic { background: #34253B; color: #9B59B6; }
+  .Legendary { background: #612F2A; color: #E74C3C; }
+  .Mythic { background: #693A57; color: #FF6EC7; }
+  .Godly { background: #65572F; color: #F2C94C; }
   .unknown { background: #2a2723; color: #8a857c; }
   .chamfer-sm { --ch: var(--control-chamfer); }
   ::-webkit-scrollbar { width: 7px; height: 7px; }
@@ -216,6 +229,7 @@
       <div class="mselect chamfer-sm" id="ms-tier"></div>
       <div class="mselect chamfer-sm" id="ms-coll"></div>
       <div class="mselect chamfer-sm" id="ms-type"></div>
+      <button class="mselect__btn" id="reset-filters" type="button" title="Clear search and all filters">Reset filters</button>
     </div>
     <div class="tablewrap">
       <table id="table">
@@ -244,7 +258,7 @@
       <button class="modal__close" id="faq-close" type="button">✕ close</button>
     </div>
     <h3>Using the controls</h3>
-    <p><b>Search</b> filters cards by name. The <b>Tiers / Collections / Type</b> dropdowns are multi-selects: click options to toggle them (each shows how many cards match). Clicking a card's tier chip in the table also filters to that tier.</p>
+    <p><b>Search</b> filters cards by name. The <b>Tiers / Collections / Type</b> dropdowns are multi-selects: click options to toggle them (each shows how many cards match). Clicking a card's tier chip in the table also filters to that tier. Filters and search are remembered between visits; <b>Reset filters</b> clears everything.</p>
     <p><b>Sorting:</b> click a column header to sort by it, click again to flip the direction (▲/▼). <b>Shift-click</b> another column to sort by that column as well &mdash; the small numbers next to the arrows show the sort order (¹ = primary, ² = secondary, and so on). Shift-clicking an already-sorted column flips its direction. A plain click on any header resets back to a single-column sort. Your sort config is remembered between visits.</p>
     <p>Hover a card's art for about a second to see a larger preview.</p>
     <h3>Where the data comes from</h3>
@@ -318,6 +332,25 @@ const MS_DEFS = [
   { id: 'coll', emptyLabel: 'All collections', values: COLLECTIONS.filter(v => collCounts[v]).map(v => ({ v, l: `${v} (${collCounts[v]})` })) },
   { id: 'type', emptyLabel: 'All types', values: [{ v: 'item', l: 'Item' }, { v: 'npc', l: 'NPC' }] },
 ];
+// ---- persisted filters: search + dropdowns are remembered between visits ----
+const FILTER_KEY = 'tcgFilters';
+function saveFilters() {
+  try {
+    localStorage.setItem(FILTER_KEY, JSON.stringify({
+      tier: [...sel.tier], coll: [...sel.coll], type: [...sel.type], q: searchEl.value,
+    }));
+  } catch {}
+}
+function loadFilters() {
+  let f;
+  try { f = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null'); } catch { return; }
+  if (!f || typeof f !== 'object') return;
+  if (Array.isArray(f.tier)) for (const v of f.tier) if (TIER_ORDER.includes(v)) sel.tier.add(v);
+  if (Array.isArray(f.coll)) for (const v of f.coll) if (COLLECTIONS.includes(v)) sel.coll.add(v);
+  if (Array.isArray(f.type)) for (const v of f.type) if (v === 'item' || v === 'npc') sel.type.add(v);
+  if (typeof f.q === 'string') searchEl.value = f.q;
+}
+loadFilters();
 const msEls = {};
 for (const def of MS_DEFS) {
   const root = document.getElementById('ms-' + def.id);
@@ -333,7 +366,24 @@ for (const def of MS_DEFS) {
       e.stopPropagation();
       sel[def.id].has(v) ? sel[def.id].delete(v) : sel[def.id].add(v);
       syncMS(def.id);
-      render();
+render();
+
+// 1s rainbow flash on each filter restored with an active selection
+for (const def of MS_DEFS) {
+  if (sel[def.id].size) {
+    const btn = msEls[def.id].btn;
+    btn.classList.add('flash-rainbow');
+    setTimeout(() => btn.classList.remove('flash-rainbow'), 1000);
+  }
+}
+
+// reset button: clear search + all filters
+document.getElementById('reset-filters').addEventListener('click', () => {
+  sel.tier.clear(); sel.coll.clear(); sel.type.clear();
+  searchEl.value = '';
+  for (const def of MS_DEFS) syncMS(def.id);
+  render();
+});
     });
     menu.appendChild(opt);
   }
@@ -514,6 +564,7 @@ function renderMore() {
 }
 
 function render() {
+  saveFilters();
   applyFilter();
   updateSortIndicators();
   tbody.innerHTML = '';
