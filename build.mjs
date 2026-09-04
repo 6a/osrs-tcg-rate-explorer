@@ -46,22 +46,42 @@ const entities = [
   ...catalog.npcs.map((i) => ({ ...i, kind: "npc" })),
 ];
 
-// Some names exist as both an item and an NPC ("Manta ray"), but circulation
-// tracks pulls per name only  Ecollapse to one row per lowercase name.
+// Some names exist as both an item and an NPC ("Manta ray"). Usually
+// circulation tracks both under the single name, but when the NPC entry has a
+// known id AND circulation has a separate "npc:{id}" key, the item and NPC
+// cards are tracked separately (e.g. item "Manta ray" vs NPC npc:15220).
+const itemNames = new Set(catalog.items.map((i) => i.name.toLowerCase()));
+const npcIdToName = new Map(
+  catalog.npcs.filter((n) => n.id > 0).map((n) => [n.name.toLowerCase(), n.id]),
+);
+
+const splitCards = new Set(); // lowercase names tracked separately by npc id
+for (const [name, id] of npcIdToName) {
+  if (itemNames.has(name) && circMerged.has(`npc:${id}`)) {
+    splitCards.add(name);
+  }
+}
+const consumedNpcKeys = new Set(
+  [...npcIdToName]
+    .filter(([name]) => splitCards.has(name))
+    .map(([, id]) => `npc:${id}`),
+);
+
+// Collapse to one row per lowercase name, except for split-tracked cards.
 const byKey = new Map();
 for (const e of entities) {
   const k = e.name.toLowerCase();
   const prev = byKey.get(k);
-  if (!prev) {
+  if (splitCards.has(k)) {
+    byKey.set(`${k}|${e.kind}`, e);
+  } else if (!prev) {
     byKey.set(k, e);
   } else if (prev.kind !== e.kind) {
     prev.kind = `${prev.kind}+${e.kind}`;
   }
 }
-const entitiesUnique = [...byKey.values()];
 
-const rows = entitiesUnique.map((e) => {
-  const stats = circMerged.get(e.name.toLowerCase()) ?? {};
+function rowFrom(e, stats) {
   const pulledNormal = stats.pulledNormal ?? 0;
   const pulledFoil = stats.pulledFoil ?? 0;
   const pulled = pulledNormal + pulledFoil;
@@ -85,12 +105,21 @@ const rows = entitiesUnique.map((e) => {
     pullRatePct: totalPulled ? (pulled / totalPulled) * 100 : 0,
     oneInX: pulled ? totalPulled / pulled : null,
   };
+}
+
+const rows = [...byKey.entries()].map(([k, e]) => {
+  let stats = circMerged.get(k.split("|")[0]) ?? {};
+  if (splitCards.has(k.split("|")[0]) && e.kind === "npc") {
+    stats = circMerged.get(`npc:${e.id}`) ?? {};
+  }
+  return rowFrom(e, stats);
 });
 
-// Circulation entries with no catalog entry (e.g. special variants)
-const knownNames = new Set(entitiesUnique.map((e) => e.name.toLowerCase()));
+// Circulation entries with no catalog entry (e.g. special variants); skip the
+// npc:{id} keys that were resolved onto NPC rows above.
+const knownNames = new Set(entities.map((e) => e.name.toLowerCase()));
 const extraRows = [...circMerged.keys()]
-  .filter((k) => !knownNames.has(k))
+  .filter((k) => !knownNames.has(k) && !consumedNpcKeys.has(k))
   .map((k) => {
     const stats = circMerged.get(k);
     const pulled = (stats.pulledNormal ?? 0) + (stats.pulledFoil ?? 0);

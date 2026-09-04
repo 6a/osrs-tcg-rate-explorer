@@ -110,6 +110,7 @@
   a { color: var(--rl-select); text-decoration: none; }
   a:hover { color: var(--rl-highlight); text-decoration: underline; }
   .rarity { display: inline-block; padding: .15rem .6rem; font-size: .72rem; font-weight: 700; letter-spacing: .03em; color: #fff; }
+  .kindtag { display: inline-block; margin-left: .4rem; padding: .1rem .45rem; font-size: .68rem; font-weight: 600; color: var(--rl-muted); background: #ffffff14; border: 1px solid var(--panel-border); vertical-align: middle; }
   .rarity-chip { cursor: pointer; }
   .Common { background: #3f3a33; color: #c8c0b4; }
   .Uncommon { background: #26583B; color: #7de89f; }
@@ -241,6 +242,16 @@ const iconIO = new IntersectionObserver((entries) => {
   }
 }, { root: document.querySelector('.tablewrap'), rootMargin: '600px' });
 
+// Cards whose item and NPC versions are tracked separately share a name;
+// tag each row so the two can be told apart.
+const splitNames = new Set();
+{
+  const counts = {};
+  D.cards.forEach(c => { if (c.kind === 'item' || c.kind === 'npc') counts[c.name.toLowerCase()] = (counts[c.name.toLowerCase()] || 0) + 1; });
+  Object.entries(counts).forEach(([n, k]) => { if (k > 1) splitNames.add(n); });
+}
+const KIND_TAG = { item: 'Item', npc: 'NPC', 'item+npc': 'Item+NPC' };
+
 function render() {
   const q = searchEl.value.toLowerCase();
   const rar = rarityEl.value, kind = kindEl.value;
@@ -256,7 +267,9 @@ function render() {
   });
   tbody.innerHTML = rows.map(c => {
     const w = wikiUrl(c);
-    const nameHtml = w ? `<a href="${w}" target="_blank">${c.name}</a>` : c.name;
+    const tag = KIND_TAG[c.kind] && (c.kind !== 'item+npc' || splitNames.has(c.name.toLowerCase()))
+      ? ` <span class="kindtag">${KIND_TAG[c.kind]}</span>` : '';
+    const nameHtml = (w ? `<a href="${w}" target="_blank">${c.name}</a>` : c.name) + tag;
     return `<tr>
       <td><span class="cardname">${artSlot(c)}${nameHtml}</span></td>
       <td>${c.rarity ? `<span class="rarity rarity-chip chamfer-sm" onclick="document.getElementById('rarity').value='${c.rarity}';render()">${c.rarity}</span>` : '<span class="rarity unknown chamfer-sm">?</span>'}</td>
