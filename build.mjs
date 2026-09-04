@@ -1,0 +1,203 @@
+// Merges the raw catalog + circulation data, computes pull rates, and writes:
+//   - pull-rates.db  (SQLite database)
+//   - data.js        (embedded data for the local frontend)
+//
+// Pull rate methodology:
+//   totalPulled   = sum over all cards of (pulledNormal + pulledFoil)
+//   card pull rate = (pulledNormal + pulledFoil) / totalPulled * 100
+//
+// Usage: node build.mjs
+
+import { DatabaseSync } from "node:sqlite";
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+
+const catalog = JSON.parse(await readFile(path.join(HERE, "raw_catalog.json"), "utf8"));
+const circulation = JSON.parse(await readFile(path.join(HERE, "raw_circulation.json"), "utf8"));
+const circ = circulation.cards;
+
+// Circulation keys are card names, but casing is inconsistent and the same card
+// can be split across case-variants (e.g. "Hoop Snake" has all the normal pulls,
+// "Hoop snake" all the foil pulls). Merge into one entry per lowercase name.
+const circMerged = new Map();
+for (const [key, stats] of Object.entries(circ)) {
+  const k = key.toLowerCase();
+  const prev = circMerged.get(k);
+  if (!prev) {
+    circMerged.set(k, { ...stats });
+  } else {
+    for (const f of ["pulledNormal", "pulledFoil", "existNormal", "existFoil"]) {
+      prev[f] = (prev[f] ?? 0) + (stats[f] ?? 0);
+    }
+    prev.highestFoilCondition = Math.max(prev.highestFoilCondition ?? 0, stats.highestFoilCondition ?? 0) || null;
+  }
+}
+
+const totalPulled = [...circMerged.values()].reduce(
+  (sum, c) => sum + (c.pulledNormal ?? 0) + (c.pulledFoil ?? 0),
+  0,
+);
+
+const entities = [
+  ...catalog.items.map((i) => ({ ...i, kind: "item" })),
+  ...catalog.npcs.map((i) => ({ ...i, kind: "npc" })),
+];
+
+// Some names exist as both an item and an NPC ("Manta ray"), but circulation
+// tracks pulls per name only  Ecollapse to one row per lowercase name.
+const byKey = new Map();
+for (const e of entities) {
+  const k = e.name.toLowerCase();
+  const prev = byKey.get(k);
+  if (!prev) {
+    byKey.set(k, e);
+  } else if (prev.kind !== e.kind) {
+    prev.kind = `${prev.kind}+${e.kind}`;
+  }
+}
+const entitiesUnique = [...byKey.values()];
+
+const rows = entitiesUnique.map((e) => {
+  const stats = circMerged.get(e.name.toLowerCase()) ?? {};
+  const pulledNormal = stats.pulledNormal ?? 0;
+  const pulledFoil = stats.pulledFoil ?? 0;
+  const pulled = pulledNormal + pulledFoil;
+  return {
+    name: e.name,
+    kind: e.kind,
+    rarity: e.tcg?.tierLabel ?? null,
+    score: e.tcg?.score ?? null,
+    foilScore: e.tcg?.foilScore ?? null,
+    labels: JSON.stringify(e.tcg?.tags?.labels ?? []),
+    variants: JSON.stringify(e.tcg?.variants ?? []),
+    examine: e.examine ?? null,
+    imagePath: e.imagePath ?? null,
+    wiki: e.wiki?.page ?? null,
+    pulledNormal,
+    pulledFoil,
+    pulled,
+    existNormal: stats.existNormal ?? null,
+    existFoil: stats.existFoil ?? null,
+    highestFoilCondition: stats.highestFoilCondition ?? null,
+    pullRatePct: totalPulled ? (pulled / totalPulled) * 100 : 0,
+    oneInX: pulled ? totalPulled / pulled : null,
+  };
+});
+
+// Circulation entries with no catalog entry (e.g. special variants)
+const knownNames = new Set(entitiesUnique.map((e) => e.name.toLowerCase()));
+const extraRows = [...circMerged.keys()]
+  .filter((k) => !knownNames.has(k))
+  .map((k) => {
+    const stats = circMerged.get(k);
+    const pulled = (stats.pulledNormal ?? 0) + (stats.pulledFoil ?? 0);
+    return {
+      name: k,
+      kind: "unknown",
+      rarity: null,
+      score: null,
+      foilScore: null,
+      labels: "[]",
+      variants: "[]",
+      examine: null,
+      imagePath: null,
+      wiki: null,
+      pulledNormal: stats.pulledNormal ?? 0,
+      pulledFoil: stats.pulledFoil ?? 0,
+      pulled,
+      existNormal: stats.existNormal ?? null,
+      existFoil: stats.existFoil ?? null,
+      highestFoilCondition: stats.highestFoilCondition ?? null,
+      pullRatePct: totalPulled ? (pulled / totalPulled) * 100 : 0,
+      oneInX: pulled ? totalPulled / pulled : null,
+    };
+  });
+
+const allRows = [...rows, ...extraRows].sort((a, b) => b.pullRatePct - a.pullRatePct);
+
+// ---- SQLite ----
+const dbPath = path.join(HERE, "pull-rates.db");
+const db = new DatabaseSync(dbPath);
+db.exec(`
+  DROP TABLE IF EXISTS cards;
+  DROP TABLE IF EXISTS meta;
+  CREATE TABLE cards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    kind TEXT,
+    rarity TEXT,
+    score INTEGER,
+    foil_score INTEGER,
+    labels TEXT,
+    variants TEXT,
+    examine TEXT,
+    image_path TEXT,
+    wiki TEXT,
+    pulled_normal INTEGER NOT NULL,
+    pulled_foil INTEGER NOT NULL,
+    pulled INTEGER NOT NULL,
+    exist_normal INTEGER,
+    exist_foil INTEGER,
+    highest_foil_condition REAL,
+    pull_rate_pct REAL NOT NULL,
+    one_in_x REAL
+  );
+  CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
+  CREATE INDEX idx_cards_rarity ON cards(rarity);
+  CREATE INDEX idx_cards_name ON cards(name);
+  CREATE INDEX idx_cards_pull_rate ON cards(pull_rate_pct);
+`);
+
+const insert = db.prepare(`
+  INSERT INTO cards (name, kind, rarity, score, foil_score, labels, variants, examine,
+                     image_path, wiki, pulled_normal, pulled_foil, pulled,
+                     exist_normal, exist_foil, highest_foil_condition,
+                     pull_rate_pct, one_in_x)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`);
+for (const r of allRows) {
+  insert.run(
+    r.name, r.kind, r.rarity, r.score, r.foilScore, r.labels, r.variants, r.examine,
+    r.imagePath, r.wiki, r.pulledNormal, r.pulledFoil, r.pulled,
+    r.existNormal, r.existFoil, r.highestFoilCondition,
+    r.pullRatePct, r.oneInX,
+  );
+}
+
+const meta = db.prepare("INSERT INTO meta (key, value) VALUES (?, ?)");
+meta.run("generatedAt", circulation.generatedAt);
+meta.run("totalPulled", String(totalPulled));
+meta.run("catalogVersion", circulation.partial === undefined ? "" : "");
+db.exec("DELETE FROM meta WHERE value = ''");
+db.close();
+
+// ---- data.js for the frontend (embedded so file:// works without a server) ----
+const frontendData = {
+  generatedAt: circulation.generatedAt,
+  totalPulled,
+  cards: allRows.map((r) => ({
+    name: r.name,
+    kind: r.kind,
+    rarity: r.rarity,
+    pulledNormal: r.pulledNormal,
+    pulledFoil: r.pulledFoil,
+    pulled: r.pulled,
+    existNormal: r.existNormal,
+    existFoil: r.existFoil,
+    highestFoilCondition: r.highestFoilCondition,
+    pullRatePct: r.pullRatePct,
+    oneInX: r.oneInX,
+    imagePath: r.imagePath,
+    wiki: r.wiki,
+  })),
+};
+await writeFile(
+  path.join(HERE, "data.js"),
+  "window.PULL_DATA = " + JSON.stringify(frontendData) + ";\n",
+);
+
+console.log(`totalPulled = ${totalPulled}`);
+console.log(`Wrote ${allRows.length} rows to pull-rates.db and data.js`);

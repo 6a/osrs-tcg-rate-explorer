@@ -1,0 +1,51 @@
+name: Update pull rates
+
+on:
+  schedule:
+    - cron: "0 * * * *" # hourly
+  workflow_dispatch: # manual trigger button
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Fetch data and build
+        working-directory: ${{ github.workspace }}
+        run: |
+          node fetch-data.mjs
+          node build.mjs
+
+      - name: Stage site
+        run: |
+          mkdir -p _site
+          cp index.html data.js _site/
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

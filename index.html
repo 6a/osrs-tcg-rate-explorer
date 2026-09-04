@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OSRS TCG Pull Rates</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, sans-serif; background: #12141a; color: #d8dce4; margin: 0; padding: 24px; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .sub { color: #8a90a0; font-size: .85rem; margin-bottom: 16px; }
+  .stats { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+  .stat { background: #1b1e27; border: 1px solid #2a2e3a; border-radius: 8px; padding: 10px 14px; }
+  .stat b { display: block; font-size: 1.1rem; color: #fff; }
+  .stat span { font-size: .75rem; color: #8a90a0; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  input, select { background: #1b1e27; color: #d8dce4; border: 1px solid #2a2e3a; border-radius: 6px; padding: 8px 10px; font-size: .9rem; }
+  input { flex: 1; min-width: 200px; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #22252f; white-space: nowrap; }
+  th { cursor: pointer; user-select: none; color: #aeb4c2; position: sticky; top: 0; background: #12141a; }
+  th:hover { color: #fff; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: #1a1d26; }
+  .rarity { padding: 2px 8px; border-radius: 10px; font-size: .75rem; font-weight: 600; }
+  .Common { background: #3a3f4d; color: #d8dce4; }
+  .Uncommon { background: #2e5138; color: #9fe0af; }
+  .Rare { background: #2b4a6b; color: #9cc8f0; }
+  .Epic { background: #4b2e66; color: #d0a8f0; }
+  .Legendary { background: #6b5420; color: #f0d080; }
+  .Mythic { background: #6b2040; color: #f0a0c0; }
+  .Godly { background: #7a4a10; color: #ffd700; }
+  .unknown { background: #333; color: #888; }
+  a { color: #7ab0e8; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .rarity-chip { cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>OSRS TCG Pull Rates</h1>
+<div class="sub" id="sub"></div>
+<div class="stats" id="stats"></div>
+<div class="controls">
+  <input id="search" type="search" placeholder="Search card name...">
+  <select id="rarity"><option value="">All rarities</option></select>
+  <select id="kind">
+    <option value="">All types</option>
+    <option value="item">Items</option>
+    <option value="npc">NPCs</option>
+    <option value="unknown">Unknown</option>
+  </select>
+</div>
+<table id="table">
+  <thead><tr>
+    <th data-k="name">Card</th>
+    <th data-k="rarity">Rarity</th>
+    <th class="num" data-k="pulledNormal">Pulled (normal)</th>
+    <th class="num" data-k="pulledFoil">Pulled (foil)</th>
+    <th class="num" data-k="pulled">Total pulled</th>
+    <th class="num" data-k="pullRatePct">Pull rate %</th>
+    <th class="num" data-k="oneInX">1 in X</th>
+    <th class="num" data-k="existNormal">Exist (normal)</th>
+    <th class="num" data-k="existFoil">Exist (foil)</th>
+  </tr></thead>
+  <tbody></tbody>
+</table>
+<script src="data.js"></script>
+<script>
+const D = window.PULL_DATA;
+const tbody = document.querySelector('#table tbody');
+const searchEl = document.getElementById('search');
+const rarityEl = document.getElementById('rarity');
+const kindEl = document.getElementById('kind');
+let sortK = 'pullRatePct', sortDir = -1;
+
+document.getElementById('sub').textContent =
+  'Generated ' + new Date(D.generatedAt).toLocaleString() +
+  ' - pull rate = card pulls / all card pulls. Data from osrs-tcg.net public API.';
+
+document.getElementById('stats').innerHTML = `
+  <div class="stat"><b>${D.cards.length.toLocaleString()}</b><span>cards</span></div>
+  <div class="stat"><b>${D.totalPulled.toLocaleString()}</b><span>total card pulls</span></div>
+  <div class="stat"><b>${D.cards.reduce((s,c)=>s+c.pulledFoil,0).toLocaleString()}</b><span>foil pulls</span></div>`;
+
+const rarities = [...new Set(D.cards.map(c => c.rarity).filter(Boolean))]
+  .sort((a, b) => D.cards.filter(c => c.rarity === b).length - D.cards.filter(c => c.rarity === a).length);
+for (const r of rarities) {
+  const o = document.createElement('option');
+  o.value = r; o.textContent = `${r} (${D.cards.filter(c => c.rarity === r).length})`;
+  rarityEl.appendChild(o);
+}
+
+function fmt(n) { return n == null ? '-' : n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 2 }); }
+function wikiUrl(c) {
+  const base = 'https://oldschool.runescape.wiki/w/';
+  return c.kind === 'npc' && c.wiki ? base + 'Special:Search?search=' + encodeURIComponent(c.wiki) : c.wiki ? base + encodeURIComponent(c.wiki.replace(/ /g, '_')) : null;
+}
+
+function render() {
+  const q = searchEl.value.toLowerCase();
+  const rar = rarityEl.value, kind = kindEl.value;
+  let rows = D.cards.filter(c =>
+    (!q || c.name.toLowerCase().includes(q)) &&
+    (!rar || c.rarity === rar) &&
+    (!kind || c.kind === kind));
+  rows.sort((a, b) => {
+    const va = a[sortK], vb = b[sortK];
+    return (va == null ? -1 : vb == null ? 1 : va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
+  });
+  tbody.innerHTML = rows.map(c => {
+    const w = wikiUrl(c);
+    return `<tr>
+      <td>${w ? `<a href="${w}" target="_blank">${c.name}</a>` : c.name}</td>
+      <td>${c.rarity ? `<span class="rarity ${c.rarity} rarity-chip" onclick="document.getElementById('rarity').value='${c.rarity}';render()">${c.rarity}</span>` : '<span class="rarity unknown">?</span>'}</td>
+      <td class="num">${c.pulledNormal.toLocaleString()}</td>
+      <td class="num">${c.pulledFoil.toLocaleString()}</td>
+      <td class="num">${c.pulled.toLocaleString()}</td>
+      <td class="num">${fmt(c.pullRatePct)}</td>
+      <td class="num">${c.oneInX ? Math.round(c.oneInX).toLocaleString() : '-'}</td>
+      <td class="num">${c.existNormal == null ? '-' : c.existNormal.toLocaleString()}</td>
+      <td class="num">${c.existFoil == null ? '-' : c.existFoil.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => {
+  const k = th.dataset.k;
+  sortDir = th.dataset.k === sortK ? -sortDir : (k === 'name' || k === 'rarity' ? 1 : -1);
+  sortK = k;
+  render();
+}));
+searchEl.addEventListener('input', render);
+rarityEl.addEventListener('change', render);
+kindEl.addEventListener('change', render);
+render();
+</script>
+</body>
+</html>
