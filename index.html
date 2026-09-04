@@ -52,7 +52,8 @@
     --ch: var(--panel-chamfer);
     background: var(--panel-border);
     border: 0;
-    box-shadow: 0 14px 34px #0000006b;
+    box-shadow: none;
+    filter: drop-shadow(0 14px 34px #0000006b);
     padding: 1px 0 1rem;
     position: relative;
     isolation: isolate;
@@ -91,21 +92,65 @@
   }
   input { flex: 1; min-width: 220px; }
   input::placeholder { color: var(--input-placeholder); }
-  input:focus, select:focus, .mselect__btn:focus { border-color: var(--rl-select); box-shadow: 0 0 0 1px color-mix(in srgb, var(--rl-select) 55%, transparent); }
+  input:focus, select:focus, .mselect__btn:focus { outline: none; }
   select:hover, .mselect__btn:hover { background: var(--control-face-hover); }
   .mselect { position: relative; }
   .mselect__btn { cursor: pointer; white-space: nowrap; }
   .mselect__btn.has-sel { border-color: var(--rl-select); color: var(--rl-highlight); }
+  /* Beveled controls, copied from the official osrs-tcg.net stylesheet
+     (.album-btn): the element itself is the border color clipped to the
+     chamfer; ::after is the fill, inset 1px with the SAME polygon (no
+     erosion math needed — the offset forms the frame). States swap CSS
+     vars only. Inputs can't have ::after, so #search gets a frame
+     wrapper exactly like official's own search field. */
+  .mselect__btn, .faq-btn, .modal__close, .stat, #preview, .search-wrap {
+    --ui-edge-color: var(--rl-control-border);
+    --ui-face: var(--control-face);
+    --ui-chamfer: var(--control-chamfer);
+    isolation: isolate;
+    position: relative;
+    background: var(--ui-edge-color);
+    border: 0;
+    clip-path: polygon(var(--ui-chamfer) 0, calc(100% - var(--ui-chamfer)) 0, 100% var(--ui-chamfer), 100% calc(100% - var(--ui-chamfer)), calc(100% - var(--ui-chamfer)) 100%, var(--ui-chamfer) 100%, 0 calc(100% - var(--ui-chamfer)), 0 var(--ui-chamfer));
+  }
+  .mselect__btn::after, .faq-btn::after, .modal__close::after, .stat::after, #preview::after, .search-wrap::after {
+    content: ""; position: absolute; inset: 1px; z-index: -1; pointer-events: none;
+    background: var(--ui-face);
+    clip-path: polygon(var(--ui-chamfer) 0, calc(100% - var(--ui-chamfer)) 0, 100% var(--ui-chamfer), 100% calc(100% - var(--ui-chamfer)), calc(100% - var(--ui-chamfer)) 100%, var(--ui-chamfer) 100%, 0 calc(100% - var(--ui-chamfer)), 0 var(--ui-chamfer));
+  }
+  #preview { --ui-face: var(--page-mid); }
+  .search-wrap { flex: 1; min-width: 220px; display: flex; }
+  #search { flex: 1; width: 100%; min-width: 0; background: transparent; border: 0; position: relative; z-index: 1; }
+  .mselect__btn:hover, .faq-btn:hover, .modal__close:hover, .search-wrap:hover { --ui-face: var(--control-face-hover); }
+  .mselect__btn.has-sel { --ui-edge-color: var(--rl-select); }
+  .mselect__btn:focus, .faq-btn:focus, .modal__close:focus {
+    --ui-edge-color: var(--rl-select);
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--rl-select) 55%, transparent));
+    outline: none;
+  }
+  .search-wrap:focus-within {
+    --ui-edge-color: var(--rl-select);
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--rl-select) 55%, transparent));
+  }
+  .modal-bevel {
+    --ui-edge-color: var(--panel-border);
+    --ui-chamfer: var(--panel-chamfer);
+    background: var(--ui-edge-color);
+    clip-path: polygon(var(--ui-chamfer) 0, calc(100% - var(--ui-chamfer)) 0, 100% var(--ui-chamfer), 100% calc(100% - var(--ui-chamfer)), calc(100% - var(--ui-chamfer)) 100%, var(--ui-chamfer) 100%, 0 calc(100% - var(--ui-chamfer)), 0 var(--ui-chamfer));
+    filter: drop-shadow(0 20px 50px #000000c0);
+    padding: 1px;
+    width: 100%; max-width: 680px; max-height: 82vh; display: flex;
+  }
   /* 1s attention flash on filters restored from the last visit */
   .mselect__btn.flash-rainbow { animation: rainbowflash 1s linear 1; }
   @keyframes rainbowflash {
-    0%, 100% { filter: brightness(1.4) drop-shadow(0 0 5px #ff3b3b); }
-    14% { filter: brightness(1.2) drop-shadow(0 0 5px #ff8c1a); }
-    28% { filter: brightness(1.55) drop-shadow(0 0 5px #ffe93b); }
-    42% { filter: brightness(1.2) drop-shadow(0 0 5px #3bdd5a); }
-    57% { filter: brightness(1.4) drop-shadow(0 0 5px #1a9fff); }
-    71% { filter: brightness(1.2) drop-shadow(0 0 5px #3b5bff); }
-    85% { filter: brightness(1.55) drop-shadow(0 0 5px #c93bff); }
+    0%, 100% { --ui-edge-color: #ff3b3b; filter: brightness(1.4) drop-shadow(0 0 5px #ff3b3b); }
+    14% { --ui-edge-color: #ff8c1a; filter: brightness(1.2) drop-shadow(0 0 5px #ff8c1a); }
+    28% { --ui-edge-color: #ffe93b; filter: brightness(1.55) drop-shadow(0 0 5px #ffe93b); }
+    42% { --ui-edge-color: #3bdd5a; filter: brightness(1.2) drop-shadow(0 0 5px #3bdd5a); }
+    57% { --ui-edge-color: #1a9fff; filter: brightness(1.4) drop-shadow(0 0 5px #1a9fff); }
+    71% { --ui-edge-color: #3b5bff; filter: brightness(1.2) drop-shadow(0 0 5px #3b5bff); }
+    85% { --ui-edge-color: #c93bff; filter: brightness(1.55) drop-shadow(0 0 5px #c93bff); }
   }
   .mselect__btn .caret { font-size: .7rem; margin-left: .4rem; }
   .mselect__menu {
@@ -173,27 +218,7 @@
   .Godly { background: #65572F; color: #F2C94C; }
   .unknown { background: #2a2723; color: #8a857c; }
   .chamfer-sm { --ch: var(--control-chamfer); }
-  /* beveled 1px frames drawn with border-image so the border follows the
-     chamfer (clip-path alone clips borders away at the diagonals).
-     Layout is unchanged: 1px transparent border, artwork extends inward. */
-  .mselect__btn, #search, .faq-btn, .modal__close, .stat, #preview {
-    border: 1px solid transparent;
-    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Crect width='15' height='15' fill='%234e4740'/%3E%3Cpath d='M6.5 0.5H8.5L14.5 6.5V8.5L8.5 14.5H6.5L0.5 8.5V6.5Z' fill='none' stroke='%238a7355'/%3E%3C/svg%3E");
-    border-image-slice: 7;
-    border-image-width: 7px;
-  }
-  #preview {
-    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Crect width='15' height='15' fill='%2325221e'/%3E%3Cpath d='M6.5 0.5H8.5L14.5 6.5V8.5L8.5 14.5H6.5L0.5 8.5V6.5Z' fill='none' stroke='%238a7355'/%3E%3C/svg%3E");
-  }
-  .mselect__btn:hover, #search:hover, .faq-btn:hover, .modal__close:hover {
-    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Crect width='15' height='15' fill='%235a5248'/%3E%3Cpath d='M6.5 0.5H8.5L14.5 6.5V8.5L8.5 14.5H6.5L0.5 8.5V6.5Z' fill='none' stroke='%238a7355'/%3E%3C/svg%3E");
-  }
-  .mselect__btn.has-sel, .mselect__btn:focus, #search:focus, .faq-btn:focus, .modal__close:focus {
-    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Crect width='15' height='15' fill='%234e4740'/%3E%3Cpath d='M6.5 0.5H8.5L14.5 6.5V8.5L8.5 14.5H6.5L0.5 8.5V6.5Z' fill='none' stroke='%23d2b36a'/%3E%3C/svg%3E");
-  }
-  .mselect__btn.has-sel:hover, .mselect__btn:focus:hover {
-    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Crect width='15' height='15' fill='%235a5248'/%3E%3Cpath d='M6.5 0.5H8.5L14.5 6.5V8.5L8.5 14.5H6.5L0.5 8.5V6.5Z' fill='none' stroke='%23d2b36a'/%3E%3C/svg%3E");
-  }
+  /* beveled control frames are defined below, next to the flash rules */
   ::-webkit-scrollbar { width: 7px; height: 7px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #8a7355a8; }
@@ -222,13 +247,12 @@
   }
   .modal-backdrop[hidden] { display: none; }
   .modal {
-    background-color: #25221e;
-    border: 1px solid transparent;
-    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='31' height='31'%3E%3Crect width='31' height='31' fill='%2325221e'/%3E%3Cpath d='M14.5 0.5H16.5L30.5 14.5V16.5L16.5 30.5H14.5L0.5 16.5V14.5Z' fill='none' stroke='%238c78586b'/%3E%3C/svg%3E");
-    border-image-slice: 15;
-    border-image-width: 15px;
-    box-shadow: 0 20px 50px #000000c0;
-    max-width: 680px; width: 100%; max-height: 82vh; overflow: auto;
+    --ui-chamfer: var(--panel-chamfer);
+    background: color-mix(in srgb, var(--page-mid) 97%, transparent);
+    border: 0;
+    clip-path: polygon(var(--ui-chamfer) 0, calc(100% - var(--ui-chamfer)) 0, 100% var(--ui-chamfer), 100% calc(100% - var(--ui-chamfer)), calc(100% - var(--ui-chamfer)) 100%, var(--ui-chamfer) 100%, 0 calc(100% - var(--ui-chamfer)), 0 var(--ui-chamfer));
+    flex: 1; min-height: 0;
+    overflow: auto;
     padding: 1rem 1.25rem 1.25rem;
   }
   .modal__head {
@@ -258,7 +282,7 @@
     </div>
     <div class="stats" id="stats"></div>
     <div class="controls">
-      <input id="search" type="search" placeholder="Search card name...">
+      <div class="search-wrap"><input id="search" type="search" placeholder="Search card name..."></div>
       <div class="mselect" id="ms-tier"></div>
       <div class="mselect" id="ms-coll"></div>
       <div class="mselect" id="ms-type"></div>
@@ -285,6 +309,7 @@
 </div>
 <div id="preview" class="chamfer-sm"><img alt=""></div>
 <div id="faq" class="modal-backdrop" hidden>
+  <div class="modal-bevel">
   <div class="modal">
     <div class="modal__head">
       <h2>Card Pull Rates &mdash; About / FAQ</h2>
@@ -306,6 +331,7 @@
     <p>An automated hourly job on a home server fetches the public API, rebuilds the dataset, and publishes everything as a static site to GitHub Pages. Nothing runs server-side when you browse, and no data about you is collected.</p>
     <h3>A note on accuracy</h3>
     <p>This app is roughly <b>95% vibe coded</b>, so mistakes are entirely possible. Double-check anything important against <a href="https://osrs-tcg.net/cards" target="_blank" rel="noopener">osrs-tcg.net</a>.</p>
+  </div>
   </div>
 </div>
 <div class="site-footer">Unofficial fan-made data viewer · data from osrs-tcg.net public API · card art © OSRS TCG</div>
