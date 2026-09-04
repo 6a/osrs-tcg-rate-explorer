@@ -411,7 +411,6 @@ const tableEl = document.getElementById('table');
 const CELL_PAD = 24; // .7rem x2 cell padding + border fudge
 const ARROW_W = 26;  // sort arrow + (up to 2-digit) precedence number
 const TAG_EXTRA = 24; // kindtag padding + border + margin-left
-const CHIP_EXTRA = 21; // rarity chip padding + border
 const NAME_EXTRA = 43; // 34px icon slot + flex gap
 const measCtx = document.createElement('canvas').getContext('2d');
 const bodyFont = getComputedStyle(document.body).fontFamily;
@@ -438,7 +437,7 @@ function lockColumnWidths() {
     const tag = KIND_TAG[c.kind] && (c.kind !== 'item+npc' || splitNames.has(c.name.toLowerCase()));
     const nameW = textW(c.name, .84, 600) + (tag ? textW(KIND_TAG[c.kind], .68, 600) + TAG_EXTRA : 0);
     if (nameW > maxes[0]) maxes[0] = nameW;
-    const chipW = textW(c.rarity || '?', .72, 700) + CHIP_EXTRA;
+    const chipW = textW(c.rarity || '?', .84, 400);
     if (chipW > maxes[1]) maxes[1] = chipW;
     const vals = [
       c.pulledNormal.toLocaleString(),
@@ -521,7 +520,7 @@ function rowHtml(c) {
     : '<span class="icon-slot empty"></span>';
   return `<tr>
     <td><span class="cardname">${art}${nameHtml}</span></td>
-    <td>${c.rarity ? `<span class="rarity rarity-chip chamfer-sm ${c.rarity}" onclick="toggleTier('${c.rarity}')">${c.rarity}</span>` : '<span class="rarity unknown chamfer-sm">?</span>'}</td>
+    <td>${c.rarity ? `<span class="tname tname-${c.rarity} rarity-chip" onclick="toggleTier('${c.rarity}')" title="Filter to ${c.rarity}">${c.rarity}</span>` : '<span style="color:var(--rl-muted)">?</span>'}</td>
     <td class="num">${c.pulledNormal.toLocaleString()}</td>
     <td class="num">${c.pulledFoil.toLocaleString()}</td>
     <td class="num">${c.pulled.toLocaleString()}</td>
