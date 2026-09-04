@@ -36,7 +36,10 @@ const HEADERS = {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function getJsonOnce(endpoint) {
-  const res = await fetch(`${BASE}/${endpoint}`, {
+  // Cloudflare caches these API responses at the edge and can serve stale
+  // copies (seen: 18h old). A cache-busting query param forces an origin fetch.
+  const url = `${BASE}/${endpoint}?cb=${Date.now()}`;
+  const res = await fetch(url, {
     headers: HEADERS,
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
@@ -46,6 +49,18 @@ async function getJsonOnce(endpoint) {
     throw err;
   }
   return res.json();
+}
+
+const MAX_AGE_MS = 2 * 60 * 60 * 1000; // circulation should be at most 2h old
+
+function warnIfStale(circulation) {
+  const age = Date.now() - new Date(circulation.generatedAt).getTime();
+  if (age > MAX_AGE_MS) {
+    console.log(
+      `WARNING: circulation data is ${Math.round(age / 60000)} min old ` +
+        `(generatedAt=${circulation.generatedAt}) - Cloudflare served a stale copy`,
+    );
+  }
 }
 
 async function getJson(endpoint) {
@@ -69,6 +84,7 @@ async function getJson(endpoint) {
 
 const catalog = await getJson("catalog/cards/live");
 const circulation = await getJson("catalog/circulation");
+warnIfStale(circulation);
 
 await writeFile(
   path.join(OUT_DIR, "raw_catalog.json"),
