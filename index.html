@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -204,7 +204,7 @@
   </div>
 </div>
 <div id="preview" class="chamfer-sm"><img alt=""></div>
-<div class="site-footer">Unofficial fan-made data viewer ﾂｷ data from osrs-tcg.net public API ﾂｷ card art ﾂｩ OSRS TCG</div>
+<div class="site-footer">Unofficial fan-made data viewer · data from osrs-tcg.net public API · card art © OSRS TCG</div>
 <script src="data.js"></script>
 <script>
 const D = window.PULL_DATA;
@@ -281,9 +281,9 @@ function syncMS(id) {
   const chosen = sel[id];
   const { btn, menu } = msEls[id];
   btn.classList.toggle('has-sel', chosen.size > 0);
-  btn.innerHTML = chosen.size === 0 ? `${def.emptyLabel} <span class="caret">笆ｾ</span>`
-    : chosen.size === 1 ? `${def.values.find(x => x.v === [...chosen][0]).l} <span class="caret">笆ｾ</span>`
-    : `${def.emptyLabel}: ${chosen.size} selected <span class="caret">笆ｾ</span>`;
+  btn.innerHTML = chosen.size === 0 ? `${def.emptyLabel} <span class="caret">▾</span>`
+    : chosen.size === 1 ? `${def.values.find(x => x.v === [...chosen][0]).l} <span class="caret">▾</span>`
+    : `${def.emptyLabel}: ${chosen.size} selected <span class="caret">▾</span>`;
   for (const opt of menu.children) opt.classList.toggle('is-selected', chosen.has(opt.dataset.v));
 }
 document.addEventListener('click', () => { for (const { menu } of Object.values(msEls)) menu.hidden = true; });
@@ -307,7 +307,7 @@ let filtered = [];
 let renderedCount = 0;
 const sentinel = document.createElement('tr');
 sentinel.id = 'sentinel';
-sentinel.innerHTML = '<td colspan="9" style="text-align:center;color:var(--rl-muted)">loading more窶ｦ</td>';
+sentinel.innerHTML = '<td colspan="9" style="text-align:center;color:var(--rl-muted)">loading more…</td>';
 const sentinelIO = new IntersectionObserver(onSentinel, { root: document.querySelector('.tablewrap'), rootMargin: '800px' });
 
 function onSentinel(entries) {
@@ -381,12 +381,12 @@ function render() {
   renderMore();
 }
 
-// show 笆ｲ/笆ｼ on the active sort column
+// show ▲/▼ on the active sort column
 document.querySelectorAll('th').forEach(th => { th.dataset.label = th.textContent; });
 function updateSortIndicators() {
   document.querySelectorAll('th').forEach(th => {
     th.textContent = th.dataset.label +
-      (th.dataset.k === sortK ? (sortDir === 1 ? ' 笆ｲ' : ' 笆ｼ') : '');
+      (th.dataset.k === sortK ? (sortDir === 1 ? ' ▲' : ' ▼') : '');
   });
 }
 
