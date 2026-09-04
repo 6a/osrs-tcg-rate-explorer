@@ -152,7 +152,8 @@
     71% { --ui-edge-color: #3b5bff; filter: brightness(1.2) drop-shadow(0 0 5px #3b5bff); }
     85% { --ui-edge-color: #c93bff; filter: brightness(1.55) drop-shadow(0 0 5px #c93bff); }
   }
-  .mselect__btn .caret { font-size: .7rem; margin-left: .4rem; }
+  .tri { display: inline-block; width: 10px; height: 7px; margin-left: .35rem; vertical-align: baseline; }
+  .tri.up { transform: rotate(180deg); }
   .mselect__menu {
     position: absolute; top: calc(100% + 4px); left: 0; z-index: 30;
     min-width: 190px; max-height: 420px; overflow: auto;
@@ -390,6 +391,9 @@ const COLLECTIONS = ['F2P', 'Kandarin', 'Misthalin', 'Asgarnia', 'Varlamore', 'T
 function fmt(n) { return n == null ? '-' : n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 2 }); }
 function artSrc(c) { return c.imagePath ? 'art' + c.imagePath.replace(/^\/images\/?/, '/') : null; }
 function escapeAttr(s) { return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+// shared triangle icon (filter carets + sort indicators), ascending = flipped
+const TRI = '<svg class="tri" viewBox="0 0 10 7" width="10" height="7" aria-hidden="true"><path d="M0 0H10L5 7Z" fill="currentColor"/></svg>';
+const TRI_UP = '<svg class="tri up" viewBox="0 0 10 7" width="10" height="7" aria-hidden="true"><path d="M0 0H10L5 7Z" fill="currentColor"/></svg>';
 function wikiUrl(c) {
   const base = 'https://oldschool.runescape.wiki/w/';
   return c.wiki ? base + encodeURIComponent(c.wiki.replace(/ /g, '_')) : null;
@@ -475,9 +479,9 @@ function syncMS(id) {
   const chosen = sel[id];
   const { btn, menu } = msEls[id];
   btn.classList.toggle('has-sel', chosen.size > 0);
-  btn.innerHTML = chosen.size === 0 ? `${def.emptyLabel} <span class="caret">▾</span>`
-    : chosen.size === 1 ? `${msLabel(def, [...chosen][0])} <span class="caret">▾</span>`
-    : `${def.emptyLabel}: ${chosen.size} selected <span class="caret">▾</span>`;
+  btn.innerHTML = chosen.size === 0 ? `${def.emptyLabel} ${TRI}`
+    : chosen.size === 1 ? `${msLabel(def, [...chosen][0])} ${TRI}`
+    : `${def.emptyLabel}: ${chosen.size} selected ${TRI}`;
   for (const opt of menu.children) opt.classList.toggle('is-selected', chosen.has(opt.dataset.v));
 }
 document.addEventListener('click', () => { for (const { menu } of Object.values(msEls)) menu.hidden = true; });
@@ -485,14 +489,15 @@ function toggleTier(t) { sel.tier.has(t) ? sel.tier.delete(t) : sel.tier.add(t);
 
 // ---- fixed filter-button widths (widest option label, so changing the
 // selection never resizes the buttons or shifts the row) ----
+const CARET_W = 16; // svg caret width + gap
 function lockFilterWidths() {
   for (const def of MS_DEFS) {
     const all = def.groups ? def.groups.flatMap((g) => g.values) : def.values;
-    let w = textW(def.emptyLabel + ' ▾', .9, 400);
-    const multi = textW(`${def.emptyLabel}: ${all.length} selected ▾`, .9, 400);
+    let w = textW(def.emptyLabel, .9, 400) + CARET_W;
+    const multi = textW(`${def.emptyLabel}: ${all.length} selected`, .9, 400) + CARET_W;
     if (multi > w) w = multi;
     for (const { l } of all) {
-      const v = textW(l + ' ▾', .9, 400);
+      const v = textW(l, .9, 400) + CARET_W;
       if (v > w) w = v;
     }
     msEls[def.id].btn.style.width = Math.ceil(w + rootPx * 1.5 + 2) + 'px';
@@ -670,7 +675,7 @@ function updateSortIndicators() {
   document.querySelectorAll('th').forEach(th => {
     const i = sortKeys.findIndex(s => s.k === th.dataset.k);
     th.innerHTML = i === -1 ? th.dataset.label
-      : escapeAttr(th.dataset.label) + (sortKeys[i].dir === 1 ? ' ▲' : ' ▼') +
+      : escapeAttr(th.dataset.label) + (sortKeys[i].dir === 1 ? TRI_UP : TRI) +
         (multi ? `<sup>${i + 1}</sup>` : '');
   });
 }
