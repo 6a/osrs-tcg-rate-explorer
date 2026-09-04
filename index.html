@@ -109,8 +109,8 @@
   .mselect__opt.is-selected .box { background: var(--rl-select); border-color: var(--rl-select); color: #1c1a17; font-weight: 700; }
   .mselect__count { margin-left: auto; font-size: .72rem; color: var(--rl-muted); }
   .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); }
-  table { width: 100%; border-collapse: collapse; font-size: .84rem; }
-  th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; }
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; }
+  th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   th {
     cursor: pointer; user-select: none; color: var(--rl-muted);
     position: sticky; top: 0; background: var(--page-mid); z-index: 2;
@@ -313,6 +313,69 @@ const splitNames = new Set();
   Object.entries(counts).forEach(([n, k]) => { if (k > 1) splitNames.add(n); });
 }
 const KIND_TAG = { item: 'Item', npc: 'NPC', 'item+npc': 'Item+NPC' };
+
+// ---- locked column widths ----
+// Measured client-side from ALL cards (not just the rendered page) so lazy
+// loading the next chunks never reflows the table. Canvas measureText is
+// environment-accurate (user fonts/DPI) unlike anything precomputed at build
+// time; re-measured once webfonts finish loading.
+const tableEl = document.getElementById('table');
+const CELL_PAD = 24; // .7rem x2 cell padding + border fudge
+const ARROW_W = 26;  // sort arrow + (up to 2-digit) precedence number
+const TAG_EXTRA = 24; // kindtag padding + border + margin-left
+const CHIP_EXTRA = 21; // rarity chip padding + border
+const NAME_EXTRA = 43; // 34px icon slot + flex gap
+const measCtx = document.createElement('canvas').getContext('2d');
+const bodyFont = getComputedStyle(document.body).fontFamily;
+const rootPx = parseFloat(getComputedStyle(document.documentElement).fontSize);
+function textW(s, sizeRem, weight) {
+  measCtx.font = `${weight} ${sizeRem * rootPx}px ${bodyFont}`;
+  return measCtx.measureText(s).width;
+}
+const COL_DEFS = [
+  { k: 'name', header: 'Card' },
+  { k: 'rarity', header: 'Tier' },
+  { k: 'pulledNormal', header: 'Pulled (normal)' },
+  { k: 'pulledFoil', header: 'Pulled (foil)' },
+  { k: 'pulled', header: 'Total pulled' },
+  { k: 'pullRatePct', header: 'Pull rate %' },
+  { k: 'oneInX', header: '1 in X' },
+  { k: 'existNormal', header: 'Exist (normal)' },
+  { k: 'existFoil', header: 'Exist (foil)' },
+  { k: 'scarcity', header: 'Pulled − exist' },
+];
+function lockColumnWidths() {
+  const maxes = COL_DEFS.map(() => 0);
+  for (const c of D.cards) {
+    const tag = KIND_TAG[c.kind] && (c.kind !== 'item+npc' || splitNames.has(c.name.toLowerCase()));
+    const nameW = textW(c.name, .84, 600) + (tag ? textW(KIND_TAG[c.kind], .68, 600) + TAG_EXTRA : 0);
+    if (nameW > maxes[0]) maxes[0] = nameW;
+    const chipW = textW(c.rarity || '?', .72, 700) + CHIP_EXTRA;
+    if (chipW > maxes[1]) maxes[1] = chipW;
+    const vals = [
+      c.pulledNormal.toLocaleString(),
+      c.pulledFoil.toLocaleString(),
+      c.pulled.toLocaleString(),
+      fmt(c.pullRatePct),
+      c.oneInX ? Math.round(c.oneInX).toLocaleString() : '-',
+      c.existNormal == null ? '-' : c.existNormal.toLocaleString(),
+      c.existFoil == null ? '-' : c.existFoil.toLocaleString(),
+      (c.scarcity > 0 ? '+' : '') + c.scarcity.toLocaleString(),
+    ];
+    for (let i = 0; i < vals.length; i++) {
+      const w = textW(vals[i], .84, 400);
+      if (w > maxes[i + 2]) maxes[i + 2] = w;
+    }
+  }
+  const widths = COL_DEFS.map((d, i) =>
+    Math.ceil(Math.max(maxes[i], textW(d.header, .8, 600)) +
+      (i === 0 ? NAME_EXTRA : 0) + CELL_PAD + ARROW_W));
+  let cg = tableEl.querySelector('colgroup');
+  if (!cg) { cg = document.createElement('colgroup'); tableEl.insertBefore(cg, tableEl.firstElementChild); }
+  cg.innerHTML = widths.map(w => `<col style="width:${w}px">`).join('');
+}
+lockColumnWidths();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(lockColumnWidths);
 
 // Rows are rendered incrementally (PAGE_SIZE at a time) so typing in the
 // search box never rebuilds thousands of DOM nodes at once; the sentinel row
