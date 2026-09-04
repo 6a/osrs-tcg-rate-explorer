@@ -95,7 +95,7 @@
   input:focus, select:focus, .mselect__btn:focus { outline: none; }
   select:hover, .mselect__btn:hover { background: var(--control-face-hover); }
   .mselect { position: relative; }
-  .mselect__btn { cursor: pointer; white-space: nowrap; }
+  .mselect__btn { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mselect__btn.has-sel { border-color: var(--rl-select); color: var(--rl-highlight); }
   /* Beveled controls, copied from the official osrs-tcg.net stylesheet
      (.album-btn): the element itself is the border color clipped to the
@@ -483,6 +483,22 @@ function syncMS(id) {
 document.addEventListener('click', () => { for (const { menu } of Object.values(msEls)) menu.hidden = true; });
 function toggleTier(t) { sel.tier.has(t) ? sel.tier.delete(t) : sel.tier.add(t); syncMS('tier'); render(); }
 
+// ---- fixed filter-button widths (widest option label, so changing the
+// selection never resizes the buttons or shifts the row) ----
+function lockFilterWidths() {
+  for (const def of MS_DEFS) {
+    const all = def.groups ? def.groups.flatMap((g) => g.values) : def.values;
+    let w = textW(def.emptyLabel + ' ▾', .9, 400);
+    const multi = textW(`${def.emptyLabel}: ${all.length} selected ▾`, .9, 400);
+    if (multi > w) w = multi;
+    for (const { l } of all) {
+      const v = textW(l + ' ▾', .9, 400);
+      if (v > w) w = v;
+    }
+    msEls[def.id].btn.style.width = Math.ceil(w + rootPx * 1.5 + 2) + 'px';
+  }
+}
+
 // Cards whose item and NPC versions are tracked separately share a name;
 // tag each row so the two can be told apart.
 const splitNames = new Set();
@@ -553,7 +569,8 @@ function lockColumnWidths() {
   cg.innerHTML = widths.map(w => `<col style="width:${w}px">`).join('');
 }
 lockColumnWidths();
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(lockColumnWidths);
+lockFilterWidths();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { lockColumnWidths(); lockFilterWidths(); });
 
 // Rows are rendered incrementally (PAGE_SIZE at a time) so typing in the
 // search box never rebuilds thousands of DOM nodes at once; the sentinel row
