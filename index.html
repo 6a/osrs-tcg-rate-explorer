@@ -366,24 +366,7 @@ for (const def of MS_DEFS) {
       e.stopPropagation();
       sel[def.id].has(v) ? sel[def.id].delete(v) : sel[def.id].add(v);
       syncMS(def.id);
-render();
-
-// 1s rainbow flash on each filter restored with an active selection
-for (const def of MS_DEFS) {
-  if (sel[def.id].size) {
-    const btn = msEls[def.id].btn;
-    btn.classList.add('flash-rainbow');
-    setTimeout(() => btn.classList.remove('flash-rainbow'), 1000);
-  }
-}
-
-// reset button: clear search + all filters
-document.getElementById('reset-filters').addEventListener('click', () => {
-  sel.tier.clear(); sel.coll.clear(); sel.type.clear();
-  searchEl.value = '';
-  for (const def of MS_DEFS) syncMS(def.id);
-  render();
-});
+      render();
     });
     menu.appendChild(opt);
   }
@@ -538,7 +521,7 @@ function rowHtml(c) {
     : '<span class="icon-slot empty"></span>';
   return `<tr>
     <td><span class="cardname">${art}${nameHtml}</span></td>
-    <td>${c.rarity ? `<span class="rarity rarity-chip chamfer-sm" onclick="toggleTier('${c.rarity}')">${c.rarity}</span>` : '<span class="rarity unknown chamfer-sm">?</span>'}</td>
+    <td>${c.rarity ? `<span class="rarity rarity-chip chamfer-sm ${c.rarity}" onclick="toggleTier('${c.rarity}')">${c.rarity}</span>` : '<span class="rarity unknown chamfer-sm">?</span>'}</td>
     <td class="num">${c.pulledNormal.toLocaleString()}</td>
     <td class="num">${c.pulledFoil.toLocaleString()}</td>
     <td class="num">${c.pulled.toLocaleString()}</td>
@@ -605,6 +588,24 @@ searchEl.addEventListener('input', () => {
   searchTimer = setTimeout(render, 150);
 });
 render();
+
+// 1s rainbow flash on each filter restored with an active selection;
+// runs once on page load, never on filter changes
+for (const def of MS_DEFS) {
+  if (sel[def.id].size) {
+    const btn = msEls[def.id].btn;
+    btn.classList.add('flash-rainbow');
+    setTimeout(() => btn.classList.remove('flash-rainbow'), 1000);
+  }
+}
+
+// reset button: clear search + all filters
+document.getElementById('reset-filters').addEventListener('click', () => {
+  sel.tier.clear(); sel.coll.clear(); sel.type.clear();
+  searchEl.value = '';
+  for (const def of MS_DEFS) syncMS(def.id);
+  render();
+});
 
 // ---- hover art preview (shows after ~1s over a card's art) ----
 const preview = document.getElementById('preview');
