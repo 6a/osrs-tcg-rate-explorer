@@ -180,14 +180,16 @@
   .mselect__count { margin-left: auto; font-size: .72rem; color: var(--rl-muted); }
   .mselect__group { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rl-muted); padding: .4rem .5rem .1rem; }
   .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); scrollbar-gutter: stable; }
-  /* rows sit directly on the page background (like osrs-tcg.net's own lists,
-     which carry no surface behind them); the sticky header keeps a solid fill
-     so scrolled rows never show through the labels */
+  /* the table sits directly on the page background (like osrs-tcg.net's own
+     lists, which carry no surface behind them); the sticky header stays
+     readable via backdrop blur, the same technique as the sticky site bar */
   table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; background: transparent; }
   th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   th {
     cursor: pointer; user-select: none; color: var(--rl-muted);
-    position: sticky; top: 0; background: var(--page-mid); z-index: 2;
+    position: sticky; top: 0; background: transparent; z-index: 2;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    text-shadow: 0 1px 2px #000000cc;
     font-weight: 600; font-size: .8rem;
   }
   th:hover { color: var(--rl-highlight); }
@@ -346,10 +348,19 @@
   </div>
   </div>
 </div>
-<div class="site-footer">Unofficial fan-made data viewer &middot; data from osrs-tcg.net public API &middot; card art &copy; OSRS TCG &middot; Vibe coded by <a href="https://github.com/6a">6a</a></div>
+<div class="site-footer">Unofficial fan-made data viewer &middot; data from osrs-tcg.net public API &middot; Vibe coded by <a href="https://github.com/6a">6a</a></div>
 <script src="data.js"></script>
 <script>
 const D = window.PULL_DATA;
+// Version skew (stale cached data.js + fresh page, or vice versa) must never
+// blank the page: missing data fails loudly in the header, a pre-Tags payload
+// just renders with an empty Tags filter until the cache catches up.
+if (!D || !Array.isArray(D.cards)) {
+  document.getElementById('sub').textContent =
+    'Data failed to load - your browser cached an old data file. Hard-refresh (Ctrl+Shift+R) to fix this.';
+  throw new Error('PULL_DATA missing or stale');
+}
+if (!Array.isArray(D.tagGroups)) D.tagGroups = [];
 // "npc:{id}" rows that failed to resolve are parser failures - hide them.
 D.cards = D.cards.filter(c => c.kind !== 'unknown');
 // supply-vs-pulls scarcity: pulled minus currently-existing copies (normal+foil)
