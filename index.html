@@ -188,8 +188,8 @@
     <div class="tablewrap">
       <table id="table">
         <thead><tr>
-          <th data-k="name">Card</th>
-          <th data-k="rarity">Tier</th>
+          <th data-k="name" title="Click: sort by this column. Shift-click: add as a secondary sort (or flip its direction).">Card</th>
+          <th data-k="rarity" title="Click: sort by this column. Shift-click: add as a secondary sort (or flip its direction).">Tier</th>
           <th class="num" data-k="pulledNormal" title="Total times this card has ever been pulled from packs">Pulled (normal)</th>
           <th class="num" data-k="pulledFoil" title="Total times this card has ever been pulled from packs (foil)">Pulled (foil)</th>
           <th class="num" data-k="pulled">Total pulled</th>
@@ -215,7 +215,19 @@ D.cards = D.cards.filter(c => c.kind !== 'unknown');
 D.cards.forEach(c => { c.scarcity = (c.pulledNormal + c.pulledFoil) - ((c.existNormal ?? 0) + (c.existFoil ?? 0)); });
 const tbody = document.querySelector('#table tbody');
 const searchEl = document.getElementById('search');
-let sortK = 'pullRatePct', sortDir = -1;
+let sortKeys = (() => {
+  // restore the visitor's last sort config; default is tier rank, low to high
+  const DEFAULT = [{ k: 'rarity', dir: 1 }];
+  try {
+    const saved = JSON.parse(localStorage.getItem('tcgSort') || 'null');
+    const keys = new Set([...document.querySelectorAll('th')].map(th => th.dataset.k));
+    if (Array.isArray(saved) && saved.length &&
+        saved.every(s => s && keys.has(s.k) && (s.dir === 1 || s.dir === -1))) return saved;
+  } catch {}
+  return DEFAULT;
+})();
+function saveSort() { try { localStorage.setItem('tcgSort', JSON.stringify(sortKeys)); } catch {} }
+const defaultDir = (k) => (k === 'name' || k === 'rarity') ? 1 : -1;
 
 document.getElementById('sub').innerHTML =
   'Generated ' + new Date(D.generatedAt).toLocaleString() +
@@ -332,16 +344,16 @@ function applyFilter() {
     return true;
   });
   filtered.sort((a, b) => {
-    let va, vb;
-    if (sortK === 'rarity') { va = TIER_RANK[a.rarity] ?? -1; vb = TIER_RANK[b.rarity] ?? -1; }
-    else { va = a[sortK]; vb = b[sortK]; }
-    let cmp = (va == null ? -1 : vb == null ? 1 : va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
-    // tie-break alphabetically by name (always ascending)
-    if (cmp === 0 && sortK !== 'name') {
-      const na = a.name.toLowerCase(), nb = b.name.toLowerCase();
-      cmp = na < nb ? -1 : na > nb ? 1 : 0;
+    for (const { k, dir } of sortKeys) {
+      let va, vb;
+      if (k === 'rarity') { va = TIER_RANK[a.rarity] ?? -1; vb = TIER_RANK[b.rarity] ?? -1; }
+      else { va = a[k]; vb = b[k]; }
+      const cmp = (va == null ? -1 : vb == null ? 1 : va < vb ? -1 : va > vb ? 1 : 0) * dir;
+      if (cmp !== 0) return cmp;
     }
-    return cmp;
+    // tie-break alphabetically by name (always ascending)
+    const na = a.name.toLowerCase(), nb = b.name.toLowerCase();
+    return na < nb ? -1 : na > nb ? 1 : 0;
   });
 }
 
@@ -391,19 +403,31 @@ function render() {
   renderMore();
 }
 
-// show ▲/▼ on the active sort column
+// show ▲/▼ on every sorted column, with its precedence when multi-sorting
 document.querySelectorAll('th').forEach(th => { th.dataset.label = th.textContent; });
 function updateSortIndicators() {
+  const multi = sortKeys.length > 1;
   document.querySelectorAll('th').forEach(th => {
-    th.textContent = th.dataset.label +
-      (th.dataset.k === sortK ? (sortDir === 1 ? ' ▲' : ' ▼') : '');
+    const i = sortKeys.findIndex(s => s.k === th.dataset.k);
+    th.innerHTML = i === -1 ? th.dataset.label
+      : escapeAttr(th.dataset.label) + (sortKeys[i].dir === 1 ? ' ▲' : ' ▼') +
+        (multi ? `<sup>${i + 1}</sup>` : '');
   });
 }
 
-document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => {
+// click: (re)sort by that column alone; shift-click: toggle direction if
+// already sorted by it, otherwise append it as a secondary sort key
+document.querySelectorAll('th').forEach(th => th.addEventListener('click', (e) => {
   const k = th.dataset.k;
-  if (sortK === k) sortDir = -sortDir;
-  else { sortK = k; sortDir = (k === 'name' || k === 'rarity') ? 1 : -1; }
+  const idx = sortKeys.findIndex(s => s.k === k);
+  if (e.shiftKey) {
+    if (idx !== -1) sortKeys[idx].dir = -sortKeys[idx].dir;
+    else sortKeys.push({ k, dir: defaultDir(k) });
+  } else {
+    if (sortKeys.length === 1 && idx === 0) sortKeys[0].dir = -sortKeys[0].dir;
+    else sortKeys = [{ k, dir: defaultDir(k) }];
+  }
+  saveSort();
   render();
 }));
 let searchTimer;
