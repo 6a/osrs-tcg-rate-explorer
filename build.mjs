@@ -92,6 +92,7 @@ function rowFrom(e, stats) {
     score: e.tcg?.score ?? null,
     foilScore: e.tcg?.foilScore ?? null,
     labels: JSON.stringify(e.tcg?.tags?.labels ?? []),
+    collections: [...new Set([...(e.tcg?.tags?.labels ?? []), ...(e.regions ?? [])])],
     variants: JSON.stringify(e.tcg?.variants ?? []),
     examine: e.examine ?? null,
     imagePath: e.imagePath ?? null,
@@ -130,6 +131,7 @@ const extraRows = [...circMerged.keys()]
       score: null,
       foilScore: null,
       labels: "[]",
+      collections: [],
       variants: "[]",
       examine: null,
       imagePath: null,
@@ -161,6 +163,7 @@ db.exec(`
     score INTEGER,
     foil_score INTEGER,
     labels TEXT,
+    collections TEXT,
     variants TEXT,
     examine TEXT,
     image_path TEXT,
@@ -181,15 +184,15 @@ db.exec(`
 `);
 
 const insert = db.prepare(`
-  INSERT INTO cards (name, kind, rarity, score, foil_score, labels, variants, examine,
+  INSERT INTO cards (name, kind, rarity, score, foil_score, labels, collections, variants, examine,
                      image_path, wiki, pulled_normal, pulled_foil, pulled,
                      exist_normal, exist_foil, highest_foil_condition,
                      pull_rate_pct, one_in_x)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 for (const r of allRows) {
   insert.run(
-    r.name, r.kind, r.rarity, r.score, r.foilScore, r.labels, r.variants, r.examine,
+    r.name, r.kind, r.rarity, r.score, r.foilScore, r.labels, JSON.stringify(r.collections), r.variants, r.examine,
     r.imagePath, r.wiki, r.pulledNormal, r.pulledFoil, r.pulled,
     r.existNormal, r.existFoil, r.highestFoilCondition,
     r.pullRatePct, r.oneInX,
@@ -219,6 +222,7 @@ const frontendData = {
     highestFoilCondition: r.highestFoilCondition,
     pullRatePct: r.pullRatePct,
     oneInX: r.oneInX,
+    collections: r.collections,
     imagePath: r.imagePath,
     wiki: r.wiki,
   })),
