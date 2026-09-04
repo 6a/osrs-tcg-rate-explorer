@@ -231,7 +231,13 @@ for (const r of allRows) {
 }
 
 const meta = db.prepare("INSERT INTO meta (key, value) VALUES (?, ?)");
-meta.run("generatedAt", circulation.generatedAt);
+// Displayed "Generated" time is locked to the scheduled run hour (the 19:00
+// run shows 19:00:00) - not the upstream snapshot time, and not the actual
+// run time down to the second.
+const runHour = new Date();
+runHour.setUTCMinutes(0, 0, 0);
+const generatedAt = runHour.toISOString();
+meta.run("generatedAt", generatedAt);
 meta.run("totalPulled", String(totalPulled));
 meta.run("catalogVersion", circulation.partial === undefined ? "" : "");
 db.exec("DELETE FROM meta WHERE value = ''");
@@ -239,7 +245,7 @@ db.close();
 
 // ---- data.js for the frontend (embedded so file:// works without a server) ----
 const frontendData = {
-  generatedAt: circulation.generatedAt,
+  generatedAt,
   totalPulled,
   tagGroups: TAG_GROUPS,
   cards: allRows.map((r) => ({

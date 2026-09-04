@@ -95,7 +95,8 @@
   input:focus, select:focus, .mselect__btn:focus { outline: none; }
   select:hover, .mselect__btn:hover { background: var(--control-face-hover); }
   .mselect { position: relative; }
-  .mselect__btn { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mselect__btn { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: transform .06s ease-out, filter .06s ease-out; }
+  .mselect__btn:active { transform: translateY(1px); filter: brightness(.82); }
   .mselect__btn.has-sel { border-color: var(--rl-select); color: var(--rl-highlight); }
   /* Beveled controls, copied from the official osrs-tcg.net stylesheet
      (.album-btn): the element itself is the border color clipped to the
@@ -154,8 +155,11 @@
   }
   .tri { display: inline-block; width: 10px; height: 7px; margin-left: .35rem; vertical-align: baseline; }
   .tri.up { transform: rotate(180deg); }
+  /* fixed (not absolute): the panel's bevel clip-path would cut off any menu
+     taller than the space below its button, so menus are positioned from the
+     button rect in JS and float above everything instead */
   .mselect__menu {
-    position: absolute; top: calc(100% + 4px); left: 0; z-index: 30;
+    position: fixed; top: 0; left: 0; z-index: 30;
     min-width: 190px; max-height: 420px; overflow: auto;
     background: var(--page-mid); border: 1px solid var(--rl-control-border);
     box-shadow: 0 10px 26px #000000a0; padding: .25rem; display: flex; flex-direction: column;
@@ -176,11 +180,16 @@
   .mselect__count { margin-left: auto; font-size: .72rem; color: var(--rl-muted); }
   .mselect__group { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rl-muted); padding: .4rem .5rem .1rem; }
   .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); scrollbar-gutter: stable; }
-  table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; }
+  /* the table sits directly on the page background (like osrs-tcg.net's own
+     lists, which carry no surface behind them); the sticky header stays
+     readable via backdrop blur, the same technique as the sticky site bar */
+  table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; background: transparent; }
   th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   th {
     cursor: pointer; user-select: none; color: var(--rl-muted);
-    position: sticky; top: 0; background: var(--page-mid); z-index: 2;
+    position: sticky; top: 0; background: transparent; z-index: 2;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    text-shadow: 0 1px 2px #000000cc;
     font-weight: 600; font-size: .8rem;
   }
   th:hover { color: var(--rl-highlight); }
@@ -339,7 +348,7 @@
   </div>
   </div>
 </div>
-<div class="site-footer">Unofficial fan-made data viewer · data from osrs-tcg.net public API · card art © OSRS TCG</div>
+<div class="site-footer">Unofficial fan-made data viewer &middot; data from osrs-tcg.net public API &middot; card art &copy; OSRS TCG &middot; Vibe coded by <a href="https://github.com/6a">6a</a></div>
 <script src="data.js"></script>
 <script>
 const D = window.PULL_DATA;
@@ -464,6 +473,7 @@ for (const def of MS_DEFS) {
     e.stopPropagation();
     for (const other of Object.values(msEls)) if (other.menu !== menu) other.menu.hidden = true;
     menu.hidden = !menu.hidden;
+    if (!menu.hidden) placeMenu(btn, menu);
   });
   root.append(btn, menu);
   msEls[def.id] = { btn, menu };
@@ -485,6 +495,18 @@ function syncMS(id) {
   for (const opt of menu.children) opt.classList.toggle('is-selected', chosen.has(opt.dataset.v));
 }
 document.addEventListener('click', () => { for (const { menu } of Object.values(msEls)) menu.hidden = true; });
+// menus float fixed-positioned, so anchor each one to its button rect on open
+// (clamped into the viewport) and close them on any scroll/resize, when the
+// anchor would otherwise drift away from the button
+function placeMenu(btn, menu) {
+  const r = btn.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
+  menu.style.top = (r.bottom + 4) + 'px';
+  menu.style.maxHeight = Math.max(140, window.innerHeight - r.bottom - 16) + 'px';
+}
+function closeMenus() { for (const { menu } of Object.values(msEls)) menu.hidden = true; }
+window.addEventListener('scroll', closeMenus, true);
+window.addEventListener('resize', closeMenus);
 function toggleTier(t) { sel.tier.has(t) ? sel.tier.delete(t) : sel.tier.add(t); syncMS('tier'); render(); }
 
 // ---- fixed filter-button widths (widest option label, so changing the
