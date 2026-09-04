@@ -300,7 +300,7 @@ const defaultDir = (k) => (k === 'name' || k === 'rarity') ? 1 : -1;
 
 document.getElementById('sub').innerHTML =
   'Generated ' + new Date(D.generatedAt).toLocaleString(undefined, { timeZoneName: 'short' }) +
-  ' &middot; pull rate = card pulls / all card pulls &middot; data from <a href="https://osrs-tcg.net/cards" target="_blank">osrs-tcg.net</a> &middot; hover a card\'s art to enlarge';
+  ' &middot; this site updates once per hour';
 
 document.getElementById('stats').innerHTML = `
   <div class="stat chamfer-sm"><b>${D.cards.length.toLocaleString()}</b><span>cards</span></div>
