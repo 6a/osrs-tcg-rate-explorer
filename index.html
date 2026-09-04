@@ -232,6 +232,7 @@ const iconIO = new IntersectionObserver((entries) => {
       const img = document.createElement('img');
       img.loading = 'lazy';
       img.decoding = 'async';
+      img.setAttribute('fetchpriority', 'low');
       img.alt = '';
       img.onerror = () => e.target.classList.add('empty');
       img.src = src;
@@ -252,37 +253,80 @@ const splitNames = new Set();
 }
 const KIND_TAG = { item: 'Item', npc: 'NPC', 'item+npc': 'Item+NPC' };
 
-function render() {
+// Rows are rendered incrementally (PAGE_SIZE at a time) so typing in the
+// search box never rebuilds thousands of DOM nodes at once; the sentinel row
+// loads the next chunk when it scrolls near the bottom of the table.
+const PAGE_SIZE = 250;
+let filtered = [];
+let renderedCount = 0;
+const sentinel = document.createElement('tr');
+sentinel.id = 'sentinel';
+sentinel.innerHTML = '<td colspan="9" style="text-align:center;color:var(--rl-muted)">loading more…</td>';
+let sentinelIO = new IntersectionObserver(onSentinel, { root: document.querySelector('.tablewrap'), rootMargin: '800px' });
+
+function onSentinel(entries) {
+  for (const e of entries) {
+    if (e.isIntersecting) renderMore();
+  }
+}
+
+function applyFilter() {
   const q = searchEl.value.toLowerCase();
   const rar = rarityEl.value, kind = kindEl.value;
-  let rows = D.cards.filter(c =>
+  filtered = D.cards.filter(c =>
     (!q || c.name.toLowerCase().includes(q)) &&
     (!rar || c.rarity === rar) &&
     (!kind || c.kind === kind));
   sortK = sortEl.value === 'name' ? 'name' : sortEl.value;
   sortDir = sortEl.value === 'name' ? 1 : -1;
-  rows.sort((a, b) => {
+  filtered.sort((a, b) => {
     const va = a[sortK], vb = b[sortK];
     return (va == null ? -1 : vb == null ? 1 : va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
   });
-  tbody.innerHTML = rows.map(c => {
-    const w = wikiUrl(c);
-    const tag = KIND_TAG[c.kind] && (c.kind !== 'item+npc' || splitNames.has(c.name.toLowerCase()))
-      ? ` <span class="kindtag">${KIND_TAG[c.kind]}</span>` : '';
-    const nameHtml = (w ? `<a href="${w}" target="_blank">${c.name}</a>` : c.name) + tag;
-    return `<tr>
-      <td><span class="cardname">${artSlot(c)}${nameHtml}</span></td>
-      <td>${c.rarity ? `<span class="rarity rarity-chip chamfer-sm" onclick="document.getElementById('rarity').value='${c.rarity}';render()">${c.rarity}</span>` : '<span class="rarity unknown chamfer-sm">?</span>'}</td>
-      <td class="num">${c.pulledNormal.toLocaleString()}</td>
-      <td class="num">${c.pulledFoil.toLocaleString()}</td>
-      <td class="num">${c.pulled.toLocaleString()}</td>
-      <td class="num">${fmt(c.pullRatePct)}</td>
-      <td class="num">${c.oneInX ? Math.round(c.oneInX).toLocaleString() : '-'}</td>
-      <td class="num">${c.existNormal == null ? '-' : c.existNormal.toLocaleString()}</td>
-      <td class="num">${c.existFoil == null ? '-' : c.existFoil.toLocaleString()}</td>
-    </tr>`;
-  }).join('');
-  tbody.querySelectorAll('.icon-slot').forEach(el => iconIO.observe(el));
+}
+
+function rowHtml(c) {
+  const w = wikiUrl(c);
+  const tag = KIND_TAG[c.kind] && (c.kind !== 'item+npc' || splitNames.has(c.name.toLowerCase()))
+    ? ` <span class="kindtag">${KIND_TAG[c.kind]}</span>` : '';
+  const nameHtml = (w ? `<a href="${w}" target="_blank">${c.name}</a>` : c.name) + tag;
+  return `<tr>
+    <td><span class="cardname">${artSlot(c)}${nameHtml}</span></td>
+    <td>${c.rarity ? `<span class="rarity rarity-chip chamfer-sm" onclick="document.getElementById('rarity').value='${c.rarity}';render()">${c.rarity}</span>` : '<span class="rarity unknown chamfer-sm">?</span>'}</td>
+    <td class="num">${c.pulledNormal.toLocaleString()}</td>
+    <td class="num">${c.pulledFoil.toLocaleString()}</td>
+    <td class="num">${c.pulled.toLocaleString()}</td>
+    <td class="num">${fmt(c.pullRatePct)}</td>
+    <td class="num">${c.oneInX ? Math.round(c.oneInX).toLocaleString() : '-'}</td>
+    <td class="num">${c.existNormal == null ? '-' : c.existNormal.toLocaleString()}</td>
+    <td class="num">${c.existFoil == null ? '-' : c.existFoil.toLocaleString()}</td>
+  </tr>`;
+}
+
+function renderMore() {
+  if (renderedCount >= filtered.length) return;
+  const end = Math.min(filtered.length, renderedCount + PAGE_SIZE);
+  sentinel.remove();
+  const chunk = filtered.slice(renderedCount, end).map(rowHtml).join('');
+  tbody.insertAdjacentHTML('beforeend', chunk);
+  const slots = tbody.querySelectorAll('.icon-slot:not([data-observed])');
+  for (let i = 0; i < slots.length; i++) {
+    slots[i].dataset.observed = '1';
+    iconIO.observe(slots[i]);
+  }
+  renderedCount = end;
+  if (renderedCount < filtered.length) {
+    tbody.appendChild(sentinel);
+    sentinelIO.observe(sentinel);
+  }
+}
+
+function render() {
+  iconIO.disconnect();
+  applyFilter();
+  tbody.innerHTML = '';
+  renderedCount = 0;
+  renderMore();
 }
 
 document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => {
@@ -291,7 +335,11 @@ document.querySelectorAll('th').forEach(th => th.addEventListener('click', () =>
   else { sortK = k; sortDir = (k === 'name' || k === 'rarity') ? 1 : -1; }
   render();
 }));
-searchEl.addEventListener('input', render);
+let searchTimer;
+searchEl.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(render, 150);
+});
 rarityEl.addEventListener('change', render);
 kindEl.addEventListener('change', render);
 render();
