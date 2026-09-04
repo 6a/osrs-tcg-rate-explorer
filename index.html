@@ -180,16 +180,15 @@
   .mselect__count { margin-left: auto; font-size: .72rem; color: var(--rl-muted); }
   .mselect__group { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rl-muted); padding: .4rem .5rem .1rem; }
   .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); scrollbar-gutter: stable; }
-  /* the table sits directly on the page background (like osrs-tcg.net's own
-     lists, which carry no surface behind them); the sticky header stays
-     readable via backdrop blur, the same technique as the sticky site bar */
+  /* rows sit directly on the page background (like osrs-tcg.net's own lists,
+     which carry no surface behind them); the sticky header keeps a solid fill
+     (a transparent + backdrop-blur header froze the renderer on real GPUs) so
+     scrolled rows never show through the labels */
   table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; background: transparent; }
   th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   th {
     cursor: pointer; user-select: none; color: var(--rl-muted);
-    position: sticky; top: 0; background: transparent; z-index: 2;
-    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    text-shadow: 0 1px 2px #000000cc;
+    position: sticky; top: 0; background: var(--page-mid); z-index: 2;
     font-weight: 600; font-size: .8rem;
   }
   th:hover { color: var(--rl-highlight); }
