@@ -119,7 +119,7 @@
   .mselect__opt.is-selected { color: var(--rl-highlight); }
   .mselect__opt.is-selected .box { background: var(--rl-select); border-color: var(--rl-select); color: #1c1a17; font-weight: 700; }
   .mselect__count { margin-left: auto; font-size: .72rem; color: var(--rl-muted); }
-  .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); }
+  .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); scrollbar-gutter: stable; }
   table { width: 100%; border-collapse: collapse; font-size: .84rem; table-layout: fixed; }
   th, td { padding: .45rem .7rem; text-align: left; border-bottom: 1px solid #ffffff0d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   th {
@@ -163,7 +163,16 @@
   .Mythic { background: #693A57; color: #FF6EC7; }
   .Godly { background: #65572F; color: #F2C94C; }
   .unknown { background: #2a2723; color: #8a857c; }
-  .chamfer-sm { --ch: var(--control-chamfer); }
+  .chamfer-sm {
+    --ch: var(--control-chamfer);
+    clip-path: polygon(var(--ch) 0, calc(100% - var(--ch)) 0, 100% var(--ch), 100% calc(100% - var(--ch)), calc(100% - var(--ch)) 100%, var(--ch) 100%, 0 calc(100% - var(--ch)), 0 var(--ch));
+  }
+  /* osrs-tcg-style beveled corners on buttons and inputs (kept off the
+     .mselect wrappers so the open dropdown menus are never clipped) */
+  .mselect__btn, #search, .faq-btn, .modal__close {
+    --ch: var(--control-chamfer);
+    clip-path: polygon(var(--ch) 0, calc(100% - var(--ch)) 0, 100% var(--ch), 100% calc(100% - var(--ch)), calc(100% - var(--ch)) 100%, var(--ch) 100%, 0 calc(100% - var(--ch)), 0 var(--ch));
+  }
   ::-webkit-scrollbar { width: 7px; height: 7px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #8a7355a8; }
@@ -226,9 +235,9 @@
     <div class="stats" id="stats"></div>
     <div class="controls">
       <input id="search" type="search" placeholder="Search card name...">
-      <div class="mselect chamfer-sm" id="ms-tier"></div>
-      <div class="mselect chamfer-sm" id="ms-coll"></div>
-      <div class="mselect chamfer-sm" id="ms-type"></div>
+      <div class="mselect" id="ms-tier"></div>
+      <div class="mselect" id="ms-coll"></div>
+      <div class="mselect" id="ms-type"></div>
       <button class="mselect__btn" id="reset-filters" type="button" title="Clear search and all filters">Reset filters</button>
     </div>
     <div class="tablewrap">
@@ -267,6 +276,7 @@
     <p>The stats are a reflection of the <b>publicly available live data</b>, which may differ from the actual server-side values (the API can serve cached snapshots, and we only see what it exposes). All we have is that public reflection. That said, by the <b>law of large numbers</b> the relative stats &mdash; pull rate %, 1-in-X &mdash; should become more accurate over time as the total number of recorded pulls grows.</p>
     <h3>How the odds are calculated</h3>
     <p><b>Pull rate %</b> = this card's total pulls (normal + foil) &divide; all card pulls, as a percentage. <b>1 in X</b> = total pulls across all cards &divide; this card's pulls &mdash; i.e. on average, roughly 1 in X pulls yields this card. These are observed frequencies from the public data, not official pack odds (which aren't published).</p>
+    <p>Average foil rate across all recorded pulls: <b id="foil-rate">&hellip;</b> (assumed ~1% &mdash; official foil odds aren't published, so this observed frequency is our best estimate).</p>
     <p><b>Exist</b> = copies currently in circulation (supply). <b>Pulled &minus; exist</b> compares interest vs supply: positive means the card has been pulled more often than copies currently exist (relatively scarce); negative means more copies exist than pulls, presumably due to beta collection imports.</p>
     <h3>How this site is hosted</h3>
     <p>An automated hourly job on a home server fetches the public API, rebuilds the dataset, and publishes everything as a static site to GitHub Pages. Nothing runs server-side when you browse, and no data about you is collected.</p>
@@ -298,9 +308,18 @@ let sortKeys = (() => {
 function saveSort() { try { localStorage.setItem('tcgSort', JSON.stringify(sortKeys)); } catch {} }
 const defaultDir = (k) => (k === 'name' || k === 'rarity') ? 1 : -1;
 
+// viewer's local timezone when possible, UTC fallback
+function fmtGenerated() {
+  const d = new Date(D.generatedAt);
+  if (isNaN(d)) return 'unknown';
+  try { return d.toLocaleString(undefined, { timeZoneName: 'short' }); }
+  catch { return d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC'); }
+}
 document.getElementById('sub').innerHTML =
-  'Generated ' + new Date(D.generatedAt).toLocaleString(undefined, { timeZoneName: 'short' }) +
-  ' &middot; this site updates once per hour';
+  'Generated ' + fmtGenerated() +
+  ' &middot; this site updates once per hour, on the hour';
+document.getElementById('foil-rate').textContent =
+  (D.cards.reduce((s, c) => s + c.pulledFoil, 0) / D.totalPulled * 100).toFixed(2) + '%';
 
 document.getElementById('stats').innerHTML = `
   <div class="stat chamfer-sm"><b>${D.cards.length.toLocaleString()}</b><span>cards</span></div>
