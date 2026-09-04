@@ -33,7 +33,7 @@
   body {
     font-family: var(--font-ui); color: var(--rl-text); margin: 0; line-height: 1.35;
     background-color: #0a0a0a;
-    background-image: linear-gradient(#00000073, #00000073), url("https://osrs-tcg.net/images/background/osrs_card_pile_perspective_bg.jpg");
+    background-image: linear-gradient(#00000073, #00000073), url("art/background/osrs_card_pile_perspective_bg.jpg");
     background-size: cover; background-position: center; background-attachment: fixed;
     -webkit-font-smoothing: antialiased;
   }
@@ -190,7 +190,7 @@ let sortK = 'pullRatePct', sortDir = -1;
 
 document.getElementById('sub').innerHTML =
   'Generated ' + new Date(D.generatedAt).toLocaleString() +
-  ' &middot; pull rate = card pulls / all card pulls &middot; data from <a href="https://osrs-tcg.net/cards" target="_blank">osrs-tcg.net</a> &middot; card art hotlinked from osrs-tcg.net (lazy-loaded, cache-shared)';
+  ' &middot; pull rate = card pulls / all card pulls &middot; data from <a href="https://osrs-tcg.net/cards" target="_blank">osrs-tcg.net</a> &middot; card art mirrored locally (osrs-tcg.net blocks hotlinking via CORP)';
 
 document.getElementById('stats').innerHTML = `
   <div class="stat chamfer-sm"><b>${D.cards.length.toLocaleString()}</b><span>cards</span></div>
@@ -207,7 +207,7 @@ for (const r of rarities) {
 
 function fmt(n) { return n == null ? '-' : n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 2 }); }
 function imgTitle(c) { return c.wiki || c.name; }
-function artSrc(c) { return c.imagePath ? 'https://osrs-tcg.net' + c.imagePath : null; }
+function artSrc(c) { return c.imagePath ? 'art' + c.imagePath.replace(/^\/images\/?/, '/') : null; }
 function artSlot(c) {
   const src = artSrc(c);
   return src ? `<span class="icon-slot" data-src="${escapeAttr(src)}"></span>` : '<span class="icon-slot empty"></span>';
@@ -218,9 +218,10 @@ function wikiUrl(c) {
   return c.wiki ? base + encodeURIComponent(c.wiki.replace(/ /g, '_')) : null;
 }
 
-// Art is hotlinked from osrs-tcg.net using the exact same URLs their site
-// uses, so visitors who have browsed osrs-tcg.net reuse their browser cache,
-// and Cloudflare edge-caches everything for everyone else.
+// Card art is mirrored to art/ by fetch-art.mjs (build time) because
+// osrs-tcg.net sets Cross-Origin-Resource-Policy: same-site, which blocks
+// hotlinking. Images are attached only when their row scrolls near the
+// viewport, so a visitor only loads the art they actually look at.
 const iconIO = new IntersectionObserver((entries) => {
   for (const e of entries) {
     if (!e.isIntersecting) continue;
