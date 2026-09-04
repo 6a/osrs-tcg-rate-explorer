@@ -195,8 +195,9 @@
           <th class="num" data-k="pulled">Total pulled</th>
           <th class="num" data-k="pullRatePct">Pull rate %</th>
           <th class="num" data-k="oneInX">1 in X</th>
-          <th class="num" data-k="existNormal" title="Copies currently in circulation across all collections">Exist (normal)</th>
-          <th class="num" data-k="existFoil" title="Copies currently in circulation across all collections (foil)">Exist (foil)</th>
+          <th class="num" data-k="existNormal" title="Copies currently in circulation (supply). 'Pulled' counts pack pulls ever (interest). Supply can exceed pulls via migration/event grants.">Exist (normal)</th>
+          <th class="num" data-k="existFoil" title="Copies currently in circulation (supply). 'Pulled' counts pack pulls ever (interest). Supply can exceed pulls via migration/event grants.">Exist (foil)</th>
+          <th class="num" data-k="scarcity" title="Pulled minus exist (normal+foil). Positive: pulled often but few copies currently exist (relatively scarce). Negative: more copies exist than have been pulled from packs (widely granted/held).">Pulled − exist</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -210,6 +211,8 @@
 const D = window.PULL_DATA;
 // "npc:{id}" rows that failed to resolve are parser failures - hide them.
 D.cards = D.cards.filter(c => c.kind !== 'unknown');
+// supply-vs-pulls scarcity: pulled minus currently-existing copies (normal+foil)
+D.cards.forEach(c => { c.scarcity = (c.pulledNormal + c.pulledFoil) - ((c.existNormal ?? 0) + (c.existFoil ?? 0)); });
 const tbody = document.querySelector('#table tbody');
 const searchEl = document.getElementById('search');
 let sortK = 'pullRatePct', sortDir = -1;
@@ -307,7 +310,7 @@ let filtered = [];
 let renderedCount = 0;
 const sentinel = document.createElement('tr');
 sentinel.id = 'sentinel';
-sentinel.innerHTML = '<td colspan="9" style="text-align:center;color:var(--rl-muted)">loading more…</td>';
+sentinel.innerHTML = '<td colspan="10" style="text-align:center;color:var(--rl-muted)">loading more…</td>';
 const sentinelIO = new IntersectionObserver(onSentinel, { root: document.querySelector('.tablewrap'), rootMargin: '800px' });
 
 function onSentinel(entries) {
@@ -332,7 +335,13 @@ function applyFilter() {
     let va, vb;
     if (sortK === 'rarity') { va = TIER_RANK[a.rarity] ?? -1; vb = TIER_RANK[b.rarity] ?? -1; }
     else { va = a[sortK]; vb = b[sortK]; }
-    return (va == null ? -1 : vb == null ? 1 : va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
+    let cmp = (va == null ? -1 : vb == null ? 1 : va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
+    // tie-break alphabetically by name (always ascending)
+    if (cmp === 0 && sortK !== 'name') {
+      const na = a.name.toLowerCase(), nb = b.name.toLowerCase();
+      cmp = na < nb ? -1 : na > nb ? 1 : 0;
+    }
+    return cmp;
   });
 }
 
@@ -357,6 +366,7 @@ function rowHtml(c) {
     <td class="num">${c.oneInX ? Math.round(c.oneInX).toLocaleString() : '-'}</td>
     <td class="num">${c.existNormal == null ? '-' : c.existNormal.toLocaleString()}</td>
     <td class="num">${c.existFoil == null ? '-' : c.existFoil.toLocaleString()}</td>
+    <td class="num">${(c.scarcity > 0 ? '+' : '') + c.scarcity.toLocaleString()}</td>
   </tr>`;
 }
 
