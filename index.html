@@ -50,15 +50,24 @@
   .main { max-width: 1600px; margin: 1.25rem auto 2rem; padding: 0 .75rem; }
   .panel {
     --ch: var(--panel-chamfer);
-    background: color-mix(in srgb, var(--panel-base) 94%, transparent);
-    border: 1px solid var(--panel-border);
+    background: var(--panel-border);
+    border: 0;
     box-shadow: 0 14px 34px #0000006b;
-    padding: 0 0 1rem;
+    padding: 1px 0 1rem;
+    position: relative;
+    isolation: isolate;
+  }
+  /* inner fill inset by the 1px frame, with a matching smaller bevel */
+  .panel::before {
+    content: ""; position: absolute; inset: 1px; z-index: -1;
+    background: color-mix(in srgb, var(--panel-base) 94%, transparent);
+    clip-path: polygon(calc(var(--panel-chamfer) - 1px) 0, calc(100% - var(--panel-chamfer) + 1px) 0, 100% calc(var(--panel-chamfer) - 1px), 100% calc(100% - var(--panel-chamfer) + 1px), calc(100% - var(--panel-chamfer) + 1px) 100%, calc(var(--panel-chamfer) - 1px) 100%, 0 calc(100% - var(--panel-chamfer) + 1px), 0 calc(var(--panel-chamfer) - 1px));
   }
   .panel__titlebar {
     text-align: center; padding: .55rem .75rem; margin-bottom: .35rem;
     border-bottom: 1px solid var(--panel-border);
     background: color-mix(in srgb, var(--panel-mid) 80%, transparent);
+    clip-path: polygon(var(--panel-chamfer) 0, calc(100% - var(--panel-chamfer)) 0, 100% var(--panel-chamfer), 100% 100%, 0 100%, 0 var(--panel-chamfer));
   }
   .panel__title {
     margin: 0; font-size: 1.15rem; font-weight: 700; letter-spacing: .02em;
@@ -90,13 +99,13 @@
   /* 1s attention flash on filters restored from the last visit */
   .mselect__btn.flash-rainbow { animation: rainbowflash 1s linear 1; }
   @keyframes rainbowflash {
-    0%, 100% { border-color: #ff3b3b; filter: brightness(1.4); }
-    14% { border-color: #ff8c1a; }
-    28% { border-color: #ffe93b; filter: brightness(1.55); }
-    42% { border-color: #3bdd5a; }
-    57% { border-color: #1a9fff; filter: brightness(1.4); }
-    71% { border-color: #3b5bff; }
-    85% { border-color: #c93bff; filter: brightness(1.55); }
+    0%, 100% { filter: brightness(1.4) drop-shadow(0 0 5px #ff3b3b); }
+    14% { filter: brightness(1.2) drop-shadow(0 0 5px #ff8c1a); }
+    28% { filter: brightness(1.55) drop-shadow(0 0 5px #ffe93b); }
+    42% { filter: brightness(1.2) drop-shadow(0 0 5px #3bdd5a); }
+    57% { filter: brightness(1.4) drop-shadow(0 0 5px #1a9fff); }
+    71% { filter: brightness(1.2) drop-shadow(0 0 5px #3b5bff); }
+    85% { filter: brightness(1.55) drop-shadow(0 0 5px #c93bff); }
   }
   .mselect__btn .caret { font-size: .7rem; margin-left: .4rem; }
   .mselect__menu {
@@ -163,15 +172,27 @@
   .Mythic { background: #693A57; color: #FF6EC7; }
   .Godly { background: #65572F; color: #F2C94C; }
   .unknown { background: #2a2723; color: #8a857c; }
-  .chamfer-sm {
-    --ch: var(--control-chamfer);
-    clip-path: polygon(var(--ch) 0, calc(100% - var(--ch)) 0, 100% var(--ch), 100% calc(100% - var(--ch)), calc(100% - var(--ch)) 100%, var(--ch) 100%, 0 calc(100% - var(--ch)), 0 var(--ch));
+  .chamfer-sm { --ch: var(--control-chamfer); }
+  /* beveled 1px frames drawn with border-image so the border follows the
+     chamfer (clip-path alone clips borders away at the diagonals).
+     Layout is unchanged: 1px transparent border, artwork extends inward. */
+  .mselect__btn, #search, .faq-btn, .modal__close, .stat, #preview {
+    border: 1px solid transparent;
+    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Crect width='15' height='15' fill='%234e4740'/%3E%3Cpath d='M6.5 0.5H8.5L14.5 6.5V8.5L8.5 14.5H6.5L0.5 8.5V6.5Z' fill='none' stroke='%238a7355'/%3E%3C/svg%3E");
+    border-image-slice: 7;
+    border-image-width: 7px;
   }
-  /* osrs-tcg-style beveled corners on buttons and inputs (kept off the
-     .mselect wrappers so the open dropdown menus are never clipped) */
-  .mselect__btn, #search, .faq-btn, .modal__close {
-    --ch: var(--control-chamfer);
-    clip-path: polygon(var(--ch) 0, calc(100% - var(--ch)) 0, 100% var(--ch), 100% calc(100% - var(--ch)), calc(100% - var(--ch)) 100%, var(--ch) 100%, 0 calc(100% - var(--ch)), 0 var(--ch));
+  #preview {
+    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Crect width='15' height='15' fill='%2325221e'/%3E%3Cpath d='M6.5 0.5H8.5L14.5 6.5V8.5L8.5 14.5H6.5L0.5 8.5V6.5Z' fill='none' stroke='%238a7355'/%3E%3C/svg%3E");
+  }
+  .mselect__btn:hover, #search:hover, .faq-btn:hover, .modal__close:hover {
+    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Crect width='15' height='15' fill='%235a5248'/%3E%3Cpath d='M6.5 0.5H8.5L14.5 6.5V8.5L8.5 14.5H6.5L0.5 8.5V6.5Z' fill='none' stroke='%238a7355'/%3E%3C/svg%3E");
+  }
+  .mselect__btn.has-sel, .mselect__btn:focus, #search:focus, .faq-btn:focus, .modal__close:focus {
+    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Crect width='15' height='15' fill='%234e4740'/%3E%3Cpath d='M6.5 0.5H8.5L14.5 6.5V8.5L8.5 14.5H6.5L0.5 8.5V6.5Z' fill='none' stroke='%23d2b36a'/%3E%3C/svg%3E");
+  }
+  .mselect__btn.has-sel:hover, .mselect__btn:focus:hover {
+    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15'%3E%3Crect width='15' height='15' fill='%235a5248'/%3E%3Cpath d='M6.5 0.5H8.5L14.5 6.5V8.5L8.5 14.5H6.5L0.5 8.5V6.5Z' fill='none' stroke='%23d2b36a'/%3E%3C/svg%3E");
   }
   ::-webkit-scrollbar { width: 7px; height: 7px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -201,9 +222,12 @@
   }
   .modal-backdrop[hidden] { display: none; }
   .modal {
-    --ch: var(--panel-chamfer);
-    background: color-mix(in srgb, var(--page-mid) 97%, transparent);
-    border: 1px solid var(--panel-border); box-shadow: 0 20px 50px #000000c0;
+    background-color: #25221e;
+    border: 1px solid transparent;
+    border-image-source: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='31' height='31'%3E%3Crect width='31' height='31' fill='%2325221e'/%3E%3Cpath d='M14.5 0.5H16.5L30.5 14.5V16.5L16.5 30.5H14.5L0.5 16.5V14.5Z' fill='none' stroke='%238c78586b'/%3E%3C/svg%3E");
+    border-image-slice: 15;
+    border-image-width: 15px;
+    box-shadow: 0 20px 50px #000000c0;
     max-width: 680px; width: 100%; max-height: 82vh; overflow: auto;
     padding: 1rem 1.25rem 1.25rem;
   }
@@ -261,7 +285,7 @@
 </div>
 <div id="preview" class="chamfer-sm"><img alt=""></div>
 <div id="faq" class="modal-backdrop" hidden>
-  <div class="modal chamfer">
+  <div class="modal">
     <div class="modal__head">
       <h2>Card Pull Rates &mdash; About / FAQ</h2>
       <button class="modal__close" id="faq-close" type="button">✕ close</button>
