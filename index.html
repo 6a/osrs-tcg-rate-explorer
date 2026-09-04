@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -184,26 +184,19 @@
       <div class="mselect chamfer-sm" id="ms-tier"></div>
       <div class="mselect chamfer-sm" id="ms-coll"></div>
       <div class="mselect chamfer-sm" id="ms-type"></div>
-      <select id="sort" class="chamfer-sm">
-        <option value="pullRatePct">Pull rate ↓</option>
-        <option value="pulled">Total pulled ↓</option>
-        <option value="pulledFoil">Foil pulled ↓</option>
-        <option value="name">Name ↑</option>
-        <option value="custom" hidden></option>
-      </select>
     </div>
     <div class="tablewrap">
       <table id="table">
         <thead><tr>
           <th data-k="name">Card</th>
           <th data-k="rarity">Tier</th>
-          <th class="num" data-k="pulledNormal">Pulled (normal)</th>
-          <th class="num" data-k="pulledFoil">Pulled (foil)</th>
+          <th class="num" data-k="pulledNormal" title="Total times this card has ever been pulled from packs">Pulled (normal)</th>
+          <th class="num" data-k="pulledFoil" title="Total times this card has ever been pulled from packs (foil)">Pulled (foil)</th>
           <th class="num" data-k="pulled">Total pulled</th>
           <th class="num" data-k="pullRatePct">Pull rate %</th>
           <th class="num" data-k="oneInX">1 in X</th>
-          <th class="num" data-k="existNormal">Exist (normal)</th>
-          <th class="num" data-k="existFoil">Exist (foil)</th>
+          <th class="num" data-k="existNormal" title="Copies currently in circulation across all collections">Exist (normal)</th>
+          <th class="num" data-k="existFoil" title="Copies currently in circulation across all collections (foil)">Exist (foil)</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -211,7 +204,7 @@
   </div>
 </div>
 <div id="preview" class="chamfer-sm"><img alt=""></div>
-<div class="site-footer">Unofficial fan-made data viewer · data from osrs-tcg.net public API · card art © OSRS TCG</div>
+<div class="site-footer">Unofficial fan-made data viewer ﾂｷ data from osrs-tcg.net public API ﾂｷ card art ﾂｩ OSRS TCG</div>
 <script src="data.js"></script>
 <script>
 const D = window.PULL_DATA;
@@ -219,12 +212,11 @@ const D = window.PULL_DATA;
 D.cards = D.cards.filter(c => c.kind !== 'unknown');
 const tbody = document.querySelector('#table tbody');
 const searchEl = document.getElementById('search');
-const sortEl = document.getElementById('sort');
 let sortK = 'pullRatePct', sortDir = -1;
 
 document.getElementById('sub').innerHTML =
   'Generated ' + new Date(D.generatedAt).toLocaleString() +
-  ' &middot; pull rate = card pulls / all card pulls &middot; data from <a href="https://osrs-tcg.net/cards" target="_blank">osrs-tcg.net</a> &middot; card art mirrored locally (osrs-tcg.net blocks hotlinking via CORP)';
+  ' &middot; pull rate = card pulls / all card pulls &middot; data from <a href="https://osrs-tcg.net/cards" target="_blank">osrs-tcg.net</a> &middot; hover a card\'s art to enlarge';
 
 document.getElementById('stats').innerHTML = `
   <div class="stat chamfer-sm"><b>${D.cards.length.toLocaleString()}</b><span>cards</span></div>
@@ -233,6 +225,7 @@ document.getElementById('stats').innerHTML = `
 
 // Official tier palette, decoded from the osrs-tcg.net client bundle.
 const TIER_ORDER = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic', 'Godly'];
+const TIER_RANK = Object.fromEntries(TIER_ORDER.map((t, i) => [t, i]));
 const COLLECTIONS = ['F2P', 'Kandarin', 'Misthalin', 'Asgarnia', 'Varlamore', 'Tirannwn',
                      'Fremennik', 'Kourend', 'Wilderness', 'Morytania', 'Sailing', 'Desert',
                      'Karamja', 'Clue'];
@@ -281,15 +274,16 @@ for (const def of MS_DEFS) {
   });
   root.append(btn, menu);
   msEls[def.id] = { btn, menu };
+  syncMS(def.id);
 }
 function syncMS(id) {
   const def = MS_DEFS.find(d => d.id === id);
   const chosen = sel[id];
   const { btn, menu } = msEls[id];
   btn.classList.toggle('has-sel', chosen.size > 0);
-  btn.innerHTML = chosen.size === 0 ? `${def.emptyLabel} <span class="caret">▾</span>`
-    : chosen.size === 1 ? `${def.values.find(x => x.v === [...chosen][0]).l} <span class="caret">▾</span>`
-    : `${def.emptyLabel}: ${chosen.size} selected <span class="caret">▾</span>`;
+  btn.innerHTML = chosen.size === 0 ? `${def.emptyLabel} <span class="caret">笆ｾ</span>`
+    : chosen.size === 1 ? `${def.values.find(x => x.v === [...chosen][0]).l} <span class="caret">笆ｾ</span>`
+    : `${def.emptyLabel}: ${chosen.size} selected <span class="caret">笆ｾ</span>`;
   for (const opt of menu.children) opt.classList.toggle('is-selected', chosen.has(opt.dataset.v));
 }
 document.addEventListener('click', () => { for (const { menu } of Object.values(msEls)) menu.hidden = true; });
@@ -313,7 +307,7 @@ let filtered = [];
 let renderedCount = 0;
 const sentinel = document.createElement('tr');
 sentinel.id = 'sentinel';
-sentinel.innerHTML = '<td colspan="9" style="text-align:center;color:var(--rl-muted)">loading more…</td>';
+sentinel.innerHTML = '<td colspan="9" style="text-align:center;color:var(--rl-muted)">loading more窶ｦ</td>';
 const sentinelIO = new IntersectionObserver(onSentinel, { root: document.querySelector('.tablewrap'), rootMargin: '800px' });
 
 function onSentinel(entries) {
@@ -335,7 +329,9 @@ function applyFilter() {
     return true;
   });
   filtered.sort((a, b) => {
-    const va = a[sortK], vb = b[sortK];
+    let va, vb;
+    if (sortK === 'rarity') { va = TIER_RANK[a.rarity] ?? -1; vb = TIER_RANK[b.rarity] ?? -1; }
+    else { va = a[sortK]; vb = b[sortK]; }
     return (va == null ? -1 : vb == null ? 1 : va < vb ? -1 : va > vb ? 1 : 0) * sortDir;
   });
 }
@@ -379,25 +375,27 @@ function renderMore() {
 
 function render() {
   applyFilter();
+  updateSortIndicators();
   tbody.innerHTML = '';
   renderedCount = 0;
   renderMore();
+}
+
+// show 笆ｲ/笆ｼ on the active sort column
+document.querySelectorAll('th').forEach(th => { th.dataset.label = th.textContent; });
+function updateSortIndicators() {
+  document.querySelectorAll('th').forEach(th => {
+    th.textContent = th.dataset.label +
+      (th.dataset.k === sortK ? (sortDir === 1 ? ' 笆ｲ' : ' 笆ｼ') : '');
+  });
 }
 
 document.querySelectorAll('th').forEach(th => th.addEventListener('click', () => {
   const k = th.dataset.k;
   if (sortK === k) sortDir = -sortDir;
   else { sortK = k; sortDir = (k === 'name' || k === 'rarity') ? 1 : -1; }
-  if ([...sortEl.options].some(o => o.value === k)) { sortEl.value = k; }
-  else { const o = sortEl.querySelector('option[value="custom"]'); o.textContent = 'Sort: ' + th.textContent; sortEl.value = 'custom'; }
   render();
 }));
-sortEl.addEventListener('change', () => {
-  if (sortEl.value === 'custom') return;
-  sortK = sortEl.value;
-  sortDir = sortEl.value === 'name' ? 1 : -1;
-  render();
-});
 let searchTimer;
 searchEl.addEventListener('input', () => {
   clearTimeout(searchTimer);
