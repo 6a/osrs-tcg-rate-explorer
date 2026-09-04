@@ -100,7 +100,7 @@
   /* Beveled controls, copied from the official osrs-tcg.net stylesheet
      (.album-btn): the element itself is the border color clipped to the
      chamfer; ::after is the fill, inset 1px with the SAME polygon (no
-     erosion math needed — the offset forms the frame). States swap CSS
+     erosion math needed - the offset forms the frame). States swap CSS
      vars only. Inputs can't have ::after, so #search gets a frame
      wrapper exactly like official's own search field. */
   .mselect__btn, .faq-btn, .modal__close, .stat, #preview, .search-wrap {
@@ -317,20 +317,20 @@
   <div class="modal-bevel">
   <div class="modal">
     <div class="modal__head">
-      <h2>Card Pull Rates &mdash; About / FAQ</h2>
+      <h2>Card Pull Rates - About / FAQ</h2>
       <button class="modal__close" id="faq-close" type="button">✕ close</button>
     </div>
     <h3>Using the controls</h3>
     <p><b>Search</b> filters cards by name. The <b>Tiers / Collections / Type / Tags</b> dropdowns are multi-selects (Tags mirrors the tag filter on osrs-tcg.net): click options to toggle them (each shows how many cards match). Clicking a card's tier chip in the table also filters to that tier. Filters and search are remembered between visits; <b>Reset filters</b> clears everything.</p>
-    <p><b>Sorting:</b> click a column header to sort by it, click again to flip the direction (▲/▼). <b>Shift-click</b> another column to sort by that column as well &mdash; the small numbers next to the arrows show the sort order (¹ = primary, ² = secondary, and so on). Shift-clicking an already-sorted column flips its direction. A plain click on any header resets back to a single-column sort. Your sort config is remembered between visits.</p>
+    <p><b>Sorting:</b> click a column header to sort by it, click again to flip the direction (▲/▼). <b>Shift-click</b> another column to sort by that column as well - the small numbers next to the arrows show the sort order (¹ = primary, ² = secondary, and so on). Shift-clicking an already-sorted column flips its direction. A plain click on any header resets back to a single-column sort. Your sort config is remembered between visits.</p>
     <p>Hover a card's art for about a second to see a larger preview.</p>
     <h3>Where the data comes from</h3>
-    <p>All stats are based on <b>publicly available data</b> from the osrs-tcg.net public API (card catalog + circulation figures). Only <b>overall values</b> per card are published &mdash; pulls and copies-in-existence are not broken down per collection, so this site cannot show per-collection stats. Collections are listed per card, but the stats themselves are global.</p>
+    <p>All stats are based on <b>publicly available data</b> from the osrs-tcg.net public API (card catalog + circulation figures). Only <b>overall values</b> per card are published - pulls and copies-in-existence are not broken down per collection, so this site cannot show per-collection stats. Collections are listed per card, but the stats themselves are global.</p>
     <h3>How accurate are the numbers?</h3>
-    <p>The stats are a reflection of the <b>publicly available live data</b>, which may differ from the actual server-side values (the API can serve cached snapshots, and we only see what it exposes). All we have is that public reflection. That said, by the <b>law of large numbers</b> the relative stats &mdash; pull rate %, 1-in-X &mdash; should become more accurate over time as the total number of recorded pulls grows.</p>
+    <p>The stats are a reflection of the <b>publicly available live data</b>, which may differ from the actual server-side values (the API can serve cached snapshots, and we only see what it exposes). All we have is that public reflection. That said, by the <b>law of large numbers</b> the relative stats - pull rate %, 1-in-X - should become more accurate over time as the total number of recorded pulls grows.</p>
     <h3>How the odds are calculated</h3>
-    <p><b>Pull rate %</b> = this card's total pulls (normal + foil) &divide; all card pulls, as a percentage. <b>1 in X</b> = total pulls across all cards &divide; this card's pulls &mdash; i.e. on average, roughly 1 in X pulls yields this card. These are observed frequencies from the public data, not official pack odds (which aren't published).</p>
-    <p>Average foil rate across all recorded pulls: <b id="foil-rate">&hellip;</b> (assumed ~1% &mdash; official foil odds aren't published, so this observed frequency is our best estimate).</p>
+    <p><b>Pull rate %</b> = this card's total pulls (normal + foil) &divide; all card pulls, as a percentage. <b>1 in X</b> = total pulls across all cards &divide; this card's pulls - i.e. on average, roughly 1 in X pulls yields this card. These are observed frequencies from the public data, not official pack odds (which aren't published).</p>
+    <p>Average foil rate across all recorded pulls: <b id="foil-rate">&hellip;</b> (assumed ~1% - official foil odds aren't published, so this observed frequency is our best estimate).</p>
     <p><b>Exist</b> = copies currently in circulation (supply). <b>Pulled &minus; exist</b> compares interest vs supply: positive means the card has been pulled more often than copies currently exist (relatively scarce); negative means more copies exist than pulls, presumably due to beta collection imports.</p>
     <h3>How this site is hosted</h3>
     <p>An automated hourly job on a home server fetches the public API, rebuilds the dataset, and publishes everything as a static site to GitHub Pages. Nothing runs server-side when you browse, and no data about you is collected.</p>

@@ -5,7 +5,7 @@
 //   GET /api/v1/catalog/cards/live   -> card catalog: name, rarity, tags, images
 //   GET /api/v1/catalog/circulation  -> per-card pull/exist counts
 //
-// Uses cascading retries with exponential backoff — the site sits behind
+// Uses cascading retries with exponential backoff - the site sits behind
 // Cloudflare and occasionally 403s or drops connections.
 //
 // Usage: node fetch-data.mjs
