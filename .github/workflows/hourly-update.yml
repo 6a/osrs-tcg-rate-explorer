@@ -1,9 +1,9 @@
-name: Update pull rates
+name: Deploy pull rates site
 
 on:
-  schedule:
-    - cron: "0 * * * *" # hourly
-  workflow_dispatch: # manual trigger button
+  push:
+    branches: [site] # local hourly task force-pushes built site here
+  workflow_dispatch: # manual trigger
 
 permissions:
   contents: read
@@ -15,28 +15,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-deploy:
+  deploy:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
+      - name: Checkout site branch
+        uses: actions/checkout@v5
         with:
-          node-version: 24
-
-      - name: Fetch data and build
-        working-directory: ${{ github.workspace }}
-        run: |
-          node fetch-data.mjs
-          node build.mjs
-
-      - name: Stage site
-        run: |
-          mkdir -p _site
-          cp index.html data.js _site/
+          ref: site
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -44,7 +32,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: .
 
       - name: Deploy to GitHub Pages
         id: deployment
