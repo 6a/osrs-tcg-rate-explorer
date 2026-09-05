@@ -69,11 +69,15 @@ const TAG_GROUPS = [
 // The API spells it "Specialattack"; the site shows "Special attack".
 const TAG_ALIASES = { Specialattack: "Special attack" };
 const KNOWN_TAGS = new Set(TAG_GROUPS.flatMap((g) => g.tags));
+// Canonical orders (official arrangement) for filter vocabularies;
+// values discovered in the data but missing here are appended automatically.
+const CANON_TIERS = ["Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic", "Godly"];
+const CANON_COLLS = ["F2P", "Kandarin", "Misthalin", "Asgarnia", "Varlamore", "Tirannwn", "Fremennik", "Kourend", "Wilderness", "Morytania", "Sailing", "Desert", "Karamja", "Clue"];
 function cardTags(e) {
   const out = new Set();
   for (const raw of (e.tcg?.tags?.labels ?? [])) {
     const t = TAG_ALIASES[raw] ?? raw;
-    if (KNOWN_TAGS.has(t)) out.add(t);
+    if (KNOWN_TAGS.has(t) || EXTRA_TAGS.has(t)) out.add(t);
   }
   if (e.kind.includes("item")) out.add("Item");
   if (e.kind.includes("npc")) out.add("NPC");
@@ -84,7 +88,22 @@ const entities = [
   ...catalog.items.map((i) => ({ ...i, kind: "item" })),
   ...catalog.npcs.map((i) => ({ ...i, kind: "npc" })),
 ];
+// Official labels the game added that aren't in our canonical groups yet
+// (and aren't covered by the Collections filter) surface under an
+// auto-generated "Other" group AND are kept on the cards that carry them,
+// so new tags appear and filter without a code change.
+const EXTRA_TAGS = new Set();
+for (const e of entities) {
+  for (const raw of (e.tcg?.tags?.labels ?? [])) {
+    const t = TAG_ALIASES[raw] ?? raw;
+    if (!KNOWN_TAGS.has(t) && !CANON_COLLS.includes(t)) EXTRA_TAGS.add(t);
+  }
+}
 for (const e of entities) e._tags = cardTags(e);
+const TAG_GROUPS_OUT = [
+  ...TAG_GROUPS,
+  ...([...EXTRA_TAGS].length ? [{ label: "Other", tags: [...EXTRA_TAGS].sort() }] : []),
+];
 
 // Some names exist as both an item and an NPC ("Manta ray"). Usually
 // circulation tracks both under the single name, but when the NPC entry has a
@@ -197,6 +216,39 @@ const allRows = [...rows, ...extraRows].sort((a, b) => b.pullRatePct - a.pullRat
 const totalExistCards = allRows.reduce((s, r) => s + (r.existNormal ?? 0) + (r.existFoil ?? 0), 0);
 const totalExistFoils = allRows.reduce((s, r) => s + (r.existFoil ?? 0), 0);
 
+// Filter vocabularies discovered from the data so new tiers, kinds, and
+// collections appear automatically. Canonical orders are kept for known
+// values; newcomers slot in sensibly (tiers by average score, collections
+// alphabetically). Pseudo-kinds used only for display merging ('item+npc')
+// and rows hidden from the table ('unknown') are excluded from filter lists.
+const scoresByTier = {};
+for (const r of allRows) {
+  if (r.rarity == null) continue;
+  (scoresByTier[r.rarity] ??= []).push(r.score ?? 0);
+}
+const avgScore = (t) => scoresByTier[t].reduce((s, v) => s + v, 0) / scoresByTier[t].length;
+const tiersSeen = [...new Set(allRows.map((r) => r.rarity).filter(Boolean))];
+const tiers = [
+  ...CANON_TIERS.filter((t) => tiersSeen.includes(t)),
+  ...tiersSeen.filter((t) => !CANON_TIERS.includes(t)).sort((a, b) => avgScore(a) - avgScore(b)),
+];
+const kindsSeen = new Set(allRows.map((r) => r.kind).filter((k) => k && k !== "item+npc" && k !== "unknown"));
+const kinds = [
+  ...["item", "npc"].filter((k) => kindsSeen.has(k)),
+  ...[...kindsSeen].filter((k) => k !== "item" && k !== "npc").sort(),
+];
+const collsSeen = new Set(allRows.flatMap((r) => r.collections));
+// New regions come from entity region data, which upstream keeps messy
+// ("A", "N", "link=..." junk rows exist), so unseen values must look like a
+// real place name to earn a filter option. Canonical names are always kept.
+const regionsSeen = new Set();
+for (const e of entities) for (const rg of (e.regions ?? [])) regionsSeen.add(rg);
+const REGION_OK = /^[A-Za-z][A-Za-z ]{2,}$/;
+const collections = [
+  ...CANON_COLLS.filter((c) => collsSeen.has(c)),
+  ...[...regionsSeen].filter((c) => !CANON_COLLS.includes(c) && REGION_OK.test(c)).sort(),
+];
+
 // ---- SQLite ----
 const dbPath = path.join(HERE, "pull-rates.db");
 const db = new DatabaseSync(dbPath);
@@ -272,7 +324,10 @@ const frontendData = {
   officialPulled,
   totalExistCards,
   totalExistFoils,
-  tagGroups: TAG_GROUPS,
+  tagGroups: TAG_GROUPS_OUT,
+  tiers,
+  kinds,
+  collections,
   cards: allRows.map((r) => ({
     name: r.name,
     kind: r.kind,

@@ -58,11 +58,19 @@ document.getElementById('stats').innerHTML = `
   (D.totalExistCards != null ? `<div class="stat chamfer-sm"><b>${D.totalExistCards.toLocaleString()} / ${D.totalExistFoils.toLocaleString()}</b><span>cards / foils in circulation</span></div>` : '');
 
 // Official tier palette, decoded from the osrs-tcg.net client bundle.
-const TIER_ORDER = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic', 'Godly'];
+const FALLBACK_TIERS = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic', 'Godly'];
+// Filter vocabularies are discovered from the data at build time so new
+// tiers, kinds, and collections appear automatically; the hardcoded lists
+// below are only a fallback for stale cached payloads predating them.
+const TIER_ORDER = Array.isArray(D.tiers) && D.tiers.length ? D.tiers : FALLBACK_TIERS;
 const TIER_RANK = Object.fromEntries(TIER_ORDER.map((t, i) => [t, i]));
-const COLLECTIONS = ['F2P', 'Kandarin', 'Misthalin', 'Asgarnia', 'Varlamore', 'Tirannwn',
+const FALLBACK_COLLS = ['F2P', 'Kandarin', 'Misthalin', 'Asgarnia', 'Varlamore', 'Tirannwn',
                      'Fremennik', 'Kourend', 'Wilderness', 'Morytania', 'Sailing', 'Desert',
                      'Karamja', 'Clue'];
+const COLLECTIONS = Array.isArray(D.collections) && D.collections.length ? D.collections : FALLBACK_COLLS;
+const kindLabel = (k) => (k === 'npc' ? 'NPC' : k.charAt(0).toUpperCase() + k.slice(1));
+const KINDS = Array.isArray(D.kinds) && D.kinds.length ? D.kinds : ['item', 'npc'];
+const TYPE_VALUES = KINDS.map((v) => ({ v, l: kindLabel(v) }));
 
 function fmt(n) { return n == null ? '-' : n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 2 }); }
 function artSrc(c) { return c.imagePath ? 'art' + c.imagePath.replace(/^\/images\/?/, '/') : null; }
@@ -86,7 +94,7 @@ const ALL_TAGS = new Set(D.tagGroups.flatMap((g) => g.tags));
 const MS_DEFS = [
   { id: 'tier', emptyLabel: 'All tiers', values: TIER_ORDER.filter(t => tierCounts[t]).map(v => ({ v, l: `${v} (${tierCounts[v]})` })) },
   { id: 'coll', emptyLabel: 'All collections', values: COLLECTIONS.filter(v => collCounts[v]).map(v => ({ v, l: `${v} (${collCounts[v]})` })) },
-  { id: 'type', emptyLabel: 'All types', values: [{ v: 'item', l: 'Item' }, { v: 'npc', l: 'NPC' }] },
+  { id: 'type', emptyLabel: 'All types', values: TYPE_VALUES },
   { id: 'tags', emptyLabel: 'All tags', groups: D.tagGroups.map((g) => ({ label: g.label, values: g.tags.filter((t) => tagCounts[t]).map((v) => ({ v, l: `${v} (${tagCounts[v]})` })) })).filter((g) => g.values.length) },
 ];
 // ---- persisted filters: search + dropdowns are remembered between visits ----
@@ -104,7 +112,7 @@ function loadFilters() {
   if (!f || typeof f !== 'object') return;
   if (Array.isArray(f.tier)) for (const v of f.tier) if (TIER_ORDER.includes(v)) sel.tier.add(v);
   if (Array.isArray(f.coll)) for (const v of f.coll) if (COLLECTIONS.includes(v)) sel.coll.add(v);
-  if (Array.isArray(f.type)) for (const v of f.type) if (v === 'item' || v === 'npc') sel.type.add(v);
+  if (Array.isArray(f.type)) for (const v of f.type) if (TYPE_VALUES.some((x) => x.v === v)) sel.type.add(v);
   if (Array.isArray(f.tags)) for (const v of f.tags) if (ALL_TAGS.has(v)) sel.tags.add(v);
   if (typeof f.q === 'string') searchEl.value = f.q;
 }
@@ -210,7 +218,8 @@ const splitNames = new Set();
   D.cards.forEach(c => { if (c.kind === 'item' || c.kind === 'npc') counts[c.name.toLowerCase()] = (counts[c.name.toLowerCase()] || 0) + 1; });
   Object.entries(counts).forEach(([n, k]) => { if (k > 1) splitNames.add(n); });
 }
-const KIND_TAG = { item: 'Item', npc: 'NPC', 'item+npc': 'Item+NPC' };
+const KIND_TAG = Object.fromEntries(TYPE_VALUES.map(({ v, l }) => [v, l]));
+KIND_TAG['item+npc'] = 'Item+NPC'; // merged display kind, never a filter value
 
 // ---- locked column widths ----
 // Measured client-side from ALL cards (not just the rendered page) so lazy
