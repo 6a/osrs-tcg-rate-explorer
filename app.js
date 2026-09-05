@@ -99,10 +99,12 @@ const MS_DEFS = [
 ];
 // ---- persisted filters: search + dropdowns are remembered between visits ----
 const FILTER_KEY = 'tcgFilters';
+let fullArtOnly = false;
 function saveFilters() {
   try {
     localStorage.setItem(FILTER_KEY, JSON.stringify({
       tier: [...sel.tier], coll: [...sel.coll], type: [...sel.type], tags: [...sel.tags], q: searchEl.value,
+      fa: fullArtOnly,
     }));
   } catch {}
 }
@@ -115,7 +117,16 @@ function loadFilters() {
   if (Array.isArray(f.type)) for (const v of f.type) if (TYPE_VALUES.some((x) => x.v === v)) sel.type.add(v);
   if (Array.isArray(f.tags)) for (const v of f.tags) if (ALL_TAGS.has(v)) sel.tags.add(v);
   if (typeof f.q === 'string') searchEl.value = f.q;
+  if (f.fa === true) fullArtOnly = true;
 }
+const fullArtBtn = document.getElementById('fullart-toggle');
+function syncFullArtToggle() { fullArtBtn.classList.toggle('has-sel', fullArtOnly); }
+fullArtBtn.addEventListener('click', () => {
+  fullArtOnly = !fullArtOnly;
+  syncFullArtToggle();
+  render();
+});
+syncFullArtToggle();
 loadFilters();
 const msEls = {};
 for (const def of MS_DEFS) {
@@ -262,7 +273,7 @@ function lockColumnWidths() {
   const maxes = COL_DEFS.map(() => 0);
   for (const c of D.cards) {
     const tag = KIND_TAG[c.kind] && (c.kind !== 'item+npc' || splitNames.has(c.name.toLowerCase()));
-    const nameW = textW(c.name, .84, 600) + (tag ? textW(KIND_TAG[c.kind], .68, 600) + TAG_EXTRA : 0);
+    const nameW = textW(c.name, .84, 600) + (tag ? textW(KIND_TAG[c.kind], .68, 600) + TAG_EXTRA : 0) + (c.fullArt ? textW('Has full art', .68, 600) + TAG_EXTRA : 0);
     if (nameW > maxes[0]) maxes[0] = nameW;
     const chipW = textW(c.rarity || '?', .84, 400);
     if (chipW > maxes[1]) maxes[1] = chipW;
@@ -312,6 +323,7 @@ function onSentinel(entries) {
 function applyFilter() {
   const q = searchEl.value.toLowerCase();
   filtered = D.cards.filter(c => {
+    if (fullArtOnly && !c.fullArt) return false;
     if (q && !c.name.toLowerCase().includes(q)) return false;
     if (sel.tier.size && !sel.tier.has(c.rarity)) return false;
     if (sel.type.size) {
@@ -341,8 +353,10 @@ function rowHtml(c) {
   const tag = KIND_TAG[c.kind] && (c.kind !== 'item+npc' || splitNames.has(c.name.toLowerCase()))
     ? ` <span class="kindtag">${KIND_TAG[c.kind]}</span>` : '';
   const tnameCls = c.rarity && TIER_ORDER.includes(c.rarity) ? ` tname-${c.rarity}` : '';
+  const fatag = (c.fullArt && c.fullArtPath)
+    ? ` <span class="fullarttag" data-fullsrc="${escapeAttr(c.fullArtPath)}">Has full art</span>` : '';
   const nameHtml = (w ? `<a class="tname${tnameCls}" href="${w}" target="_blank">${c.name}</a>`
-                      : `<span class="tname${tnameCls}">${c.name}</span>`) + tag;
+                      : `<span class="tname${tnameCls}">${c.name}</span>`) + tag + fatag;
   const src = artSrc(c);
   const art = src
     ? `<span class="icon-slot" data-src="${escapeAttr(src)}"><img src="${escapeAttr(src)}" loading="lazy" decoding="async" fetchpriority="low" alt="" onerror="this.parentElement.classList.add('empty')"></span>`
@@ -426,11 +440,17 @@ for (const def of MS_DEFS) {
     setTimeout(() => btn.classList.remove('flash-rainbow'), 1000);
   }
 }
+if (fullArtOnly) {
+  fullArtBtn.classList.add('flash-rainbow');
+  setTimeout(() => fullArtBtn.classList.remove('flash-rainbow'), 1000);
+}
 
 // reset button: clear search + all filters
 document.getElementById('reset-filters').addEventListener('click', () => {
   sel.tier.clear(); sel.coll.clear(); sel.type.clear(); sel.tags.clear();
   searchEl.value = '';
+  fullArtOnly = false;
+  syncFullArtToggle();
   for (const def of MS_DEFS) syncMS(def.id);
   render();
 });
@@ -440,30 +460,45 @@ const preview = document.getElementById('preview');
 const previewImg = preview.querySelector('img');
 let previewTimer = null, mouseX = 0, mouseY = 0;
 tbody.addEventListener('mousemove', (e) => { mouseX = e.clientX; mouseY = e.clientY; });
+previewImg.onerror = () => { preview.style.display = 'none'; };
+let previewSeq = 0; // guards async image loads against stale hovers
+function hidePreview() {
+  previewSeq++;
+  clearTimeout(previewTimer);
+  preview.style.display = 'none';
+  preview.classList.remove('is-fullart');
+}
 tbody.addEventListener('mouseover', (e) => {
-  const slot = e.target.closest('.icon-slot');
-  if (!slot || !slot.dataset.src) return;
+  const trig = e.target.closest('.icon-slot,.fullarttag');
+  if (!trig) return;
+  const src = trig.dataset.src || trig.dataset.fullsrc;
+  if (!src) return;
   clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
-    previewImg.src = slot.dataset.src;
-    preview.style.display = 'block';
-    const r = preview.getBoundingClientRect();
-    let x = mouseX + 18, y = mouseY + 12;
-    if (x + r.width > innerWidth - 8) x = mouseX - r.width - 18;
-    if (y + r.height > innerHeight - 8) y = Math.max(8, innerHeight - r.height - 8);
-    preview.style.left = x + 'px';
-    preview.style.top = y + 'px';
-  }, 1000);
+    const seq = ++previewSeq;
+    // full-art popup width is clamped to the card-art width (see styles.css)
+    preview.classList.toggle('is-fullart', !trig.dataset.src);
+    // position only once the image has its natural size, so the popup
+    // fits the art (card or full art) instead of a fixed box
+    previewImg.onload = () => {
+      if (seq !== previewSeq) return;
+      preview.style.display = 'block';
+      const r = preview.getBoundingClientRect();
+      let x = mouseX + 18, y = mouseY + 12;
+      if (x + r.width > innerWidth - 8) x = mouseX - r.width - 18;
+      if (y + r.height > innerHeight - 8) y = Math.max(8, innerHeight - r.height - 8);
+      preview.style.left = x + 'px';
+      preview.style.top = y + 'px';
+    };
+    previewImg.src = src;
+  }, 500);
 });
 tbody.addEventListener('mouseout', (e) => {
-  if (!e.target.closest('.icon-slot')) return;
-  clearTimeout(previewTimer);
-  preview.style.display = 'none';
+  if (!e.target.closest('.icon-slot,.fullarttag')) return;
+  if (e.relatedTarget?.closest?.('.icon-slot,.fullarttag')) return;
+  hidePreview();
 });
-document.querySelector('.tablewrap').addEventListener('scroll', () => {
-  clearTimeout(previewTimer);
-  preview.style.display = 'none';
-}, { passive: true });
+document.querySelector('.tablewrap').addEventListener('scroll', hidePreview, { passive: true });
 
 // ---- FAQ modal ----
 const faqEl = document.getElementById('faq');

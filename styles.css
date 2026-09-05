@@ -220,6 +220,7 @@
   .tname-Godly { color: #F2C94C; }
   .rarity { display: inline-block; padding: .15rem .6rem; font-size: .72rem; font-weight: 700; letter-spacing: .03em; color: #fff; }
   .kindtag { display: inline-block; margin-left: .4rem; padding: .1rem .45rem; font-size: .68rem; font-weight: 600; color: var(--rl-muted); background: #ffffff14; border: 1px solid var(--panel-border); vertical-align: middle; }
+  .fullarttag { display: inline-block; margin-left: .4rem; padding: .1rem .45rem; font-size: .68rem; font-weight: 600; color: #F2C94C; background: #F2C94C14; border: 1px solid #8a7355; vertical-align: middle; cursor: help; }
   .rarity-chip { cursor: pointer; }
   /* chip text uses the official tier palette (same as the name column);
      Epic lightened from #5B2C6F for contrast, like the names */
@@ -242,7 +243,11 @@
     background: var(--page-mid); border: 1px solid var(--rl-control-border);
     box-shadow: 0 14px 34px #000000b0; padding: 8px;
   }
-  #preview img { display: block; width: 240px; height: 240px; object-fit: contain; }
+  #preview img { display: block; width: auto; height: auto; max-width: min(70vw, 640px); max-height: 70vh; }
+  /* full-art source files run much wider than card art (730px+ vs 250px),
+     so clamp the full-art popup width to the card-art width; height follows
+     aspect automatically (70vh cap still applies) */
+  #preview.is-fullart img { max-width: 250px; }
   .site-footer {
     text-align: center; color: var(--rl-muted); font-size: .75rem;
     border-top: 1px solid var(--panel-border); padding: .5rem; margin-top: 1rem;

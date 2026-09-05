@@ -26,6 +26,7 @@
       <div class="mselect" id="ms-coll"></div>
       <div class="mselect" id="ms-type"></div>
       <div class="mselect" id="ms-tags"></div>
+      <button class="mselect__btn" id="fullart-toggle" type="button" title="Show only cards with a pulled community full-art version">Full art only</button>
       <button class="mselect__btn" id="reset-filters" type="button" title="Clear search and all filters">Reset filters</button>
     </div>
     <div class="tablewrap">
@@ -55,10 +56,11 @@
       <h2>Card Pull Rates - About / FAQ</h2>
       <button class="modal__close" id="faq-close" type="button">✕ close</button>
     </div>
-    <h3>Using the controls</h3>
+    <h3>How to use this site</h3>
     <p><b>Search</b> filters by card name; the <b>Tier / Collection / Type / Tags</b> dropdowns are multi-selects (Tags mirrors osrs-tcg.net) with per-option match counts. Clicking a tier chip in the table filters to that tier. Filters, sorting, and search persist between visits; <b>Reset filters</b> clears everything.</p>
     <p><b>Sorting:</b> click a header to sort, click again to flip direction. <b>Shift-click</b> adds a secondary sort - small numbers mark the order (¹ primary, ² secondary). Shift-clicking a sorted column flips it; a plain click resets to a single-column sort.</p>
-    <p>Hover a card's art for about a second to see a larger preview.</p>
+    <p>Hover a card's icon for half a second to see a larger preview, sized to the artwork itself.</p>
+    <p>Cards with a known full-art version carry a gold <b>Has full art</b> tag next to the type tag - hover it for half a second to preview the full art. The <b>Full art only</b> button shows just those cards. The set changes as new full-art cards get pulled or added.</p>
     <h3>Where the data comes from</h3>
     <p>All stats come from the osrs-tcg.net public API (card catalog + circulation). Only per-card totals are published - nothing is broken down per collection, so per-collection stats aren't possible; the stats themselves are global.</p>
     <h3>Where the headline numbers come from</h3>
@@ -66,10 +68,10 @@
     <p>Footnote: on the morning of Sep 5 (UTC) the official per-card totals jumped ~30% in a bulk backfill (~1.3&times; across nearly all cards) - older snapshots read much lower.</p>
     <h3>How the odds are calculated</h3>
     <p><b>Pull rate %</b> = this card's total pulls (normal + foil) &divide; all card pulls, as a percentage. <b>1 in X</b> = total pulls across all cards &divide; this card's pulls - i.e. on average, roughly 1 in X pulls yields this card. These are observed frequencies from the public data, not official pack odds (which aren't published).</p>
-    <p>Each pack holds <b>5 cards</b>; a foil takes one slot. The foil rate is <b id="foil-rate">&hellip;</b> of tracked pulls, bounded by <b id="foil-bounds">&hellip;</b> (removed cards were almost never foils) - computed live on every load, never fixed. The community's long-standing 1% assumption checks out. No official foil odds exist and the public data could be incomplete, so treat it as the best estimate, not gospel.</p>
+    <p>Each pack holds <b>5 cards</b>; a foil takes one slot. The foil rate is <b id="foil-rate">&hellip;</b> of tracked pulls, bounded by <b id="foil-bounds">&hellip;</b> (removed cards were almost never foils) - computed live every time the site is updated. The community's long-standing 1% assumption checks out.</p>
     <p><b>Exist</b> = copies currently owned. <b>Pulled &minus; exist</b> = tracked pulls no longer owned (currently <b id="unowned">&hellip;</b>), almost all normals - sold, consumed, or removed (only a few hundred tracked foils are missing). Negative means more owned than pulled: a few cards were granted outside packs or remapped (e.g. Hoop snake, Crawling Hand).</p>
     <h3>How this site is hosted</h3>
-    <p>An automated hourly job on a home server fetches the public API, rebuilds the dataset, and publishes everything as a static site to GitHub Pages. Nothing runs server-side when you browse, and no data about you is collected.</p>
+    <p>An automated hourly job on a home server fetches data from public API, rebuilds the dataset, and publishes everything as a static site to GitHub Pages. Nothing runs server-side when you browse, and no data about you is collected.</p>
     <h3>A note on accuracy</h3>
     <p>This app is roughly <b>95% vibe coded</b>, so mistakes are entirely possible. Double-check anything important against <a href="https://osrs-tcg.net/cards" target="_blank" rel="noopener">osrs-tcg.net</a>.</p>
   </div>

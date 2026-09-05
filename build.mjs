@@ -10,6 +10,7 @@
 
 import { DatabaseSync } from "node:sqlite";
 import { readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,6 +34,10 @@ for (const [key, stats] of Object.entries(circ)) {
       prev[f] = (prev[f] ?? 0) + (stats[f] ?? 0);
     }
     prev.highestFoilCondition = Math.max(prev.highestFoilCondition ?? 0, stats.highestFoilCondition ?? 0) || null;
+    // Full-art path rides the same merge: first-non-empty-wins, so a
+    // Hoop-Snake-style case split where the first-seen variant lacks the
+    // path must not lose the star.
+    if (!prev.foilImagePath && stats.foilImagePath) prev.foilImagePath = stats.foilImagePath;
   }
 }
 
@@ -141,10 +146,27 @@ for (const e of entities) {
   }
 }
 
+// Official "Full art only" predicate (verbatim from the osrs-tcg.net bundle):
+// Number(pulledFoil) > 0 && non-empty foilImagePath. ULID extracted for the
+// local mirror path. Regex duplicated in fetch-art.mjs (separate processes;
+// build.mjs executes on import so one cannot import the other).
+function fullArtFrom(stats) {
+  const hasArt =
+    Number(stats.pulledFoil) > 0 &&
+    typeof stats.foilImagePath === "string" &&
+    stats.foilImagePath.trim() !== "";
+  if (!hasArt) return { fullArt: 0, fullArtPath: null };
+  const m = /\/files\/([A-Za-z0-9]+)/.exec(stats.foilImagePath);
+  if (!m) return { fullArt: 0, fullArtPath: null };
+  // .png is a guess here; the existence gate resolves the real extension.
+  return { fullArt: 1, fullArtPath: `art/full/${m[1]}.png` };
+}
+
 function rowFrom(e, stats) {
   const pulledNormal = stats.pulledNormal ?? 0;
   const pulledFoil = stats.pulledFoil ?? 0;
   const pulled = pulledNormal + pulledFoil;
+  const { fullArt, fullArtPath } = fullArtFrom(stats);
   return {
     name: e.name,
     kind: e.kind,
@@ -166,6 +188,8 @@ function rowFrom(e, stats) {
     highestFoilCondition: stats.highestFoilCondition ?? null,
     pullRatePct: totalPulled ? (pulled / totalPulled) * 100 : 0,
     oneInX: pulled ? totalPulled / pulled : null,
+    fullArt,
+    fullArtPath,
   };
 }
 
@@ -185,6 +209,8 @@ const extraRows = [...circMerged.keys()]
   .map((k) => {
     const stats = circMerged.get(k);
     const pulled = (stats.pulledNormal ?? 0) + (stats.pulledFoil ?? 0);
+    // extraRows bypasses rowFrom: duplicate the fullArt computation explicitly.
+    const { fullArt, fullArtPath } = fullArtFrom(stats);
     return {
       name: k,
       kind: "unknown",
@@ -206,10 +232,40 @@ const extraRows = [...circMerged.keys()]
       highestFoilCondition: stats.highestFoilCondition ?? null,
       pullRatePct: totalPulled ? (pulled / totalPulled) * 100 : 0,
       oneInX: pulled ? totalPulled / pulled : null,
+      fullArt,
+      fullArtPath,
     };
   });
 
 const allRows = [...rows, ...extraRows].sort((a, b) => b.pullRatePct - a.pullRatePct);
+
+// Mirror files keep their real extension (sniffed by fetch-art.mjs -
+// community uploads are not all PNGs). List duplicated there (separate
+// processes; build.mjs executes on import so one cannot import the other).
+const FULL_ART_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
+
+// EXISTENCE GATE (placement load-bearing: immediately after allRows, BEFORE
+// totalExistCards, SQLite INSERTs, and frontendData). The pipeline runs build
+// BEFORE fetch-art, so a star must never be emitted for bytes not yet
+// mirrored. Probes each candidate extension and rewrites fullArtPath to the
+// file that actually exists; force fullArt=0 when no mirror file is present.
+// Do NOT reorder the pipeline to "fix" this; the gate is the fix.
+function resolveFullArtPath(pathGuess) {
+  for (const ext of FULL_ART_EXTS) {
+    const p = pathGuess.replace(/\.png$/, `.${ext}`);
+    if (existsSync(path.join(HERE, p))) return p;
+  }
+  return null;
+}
+for (const r of allRows) {
+  if (!r.fullArt) continue;
+  const hit = resolveFullArtPath(r.fullArtPath);
+  if (hit) r.fullArtPath = hit;
+  else {
+    r.fullArt = 0;
+    r.fullArtPath = null;
+  }
+}
 
 // Copies currently in circulation (supply), over ALL rows including the
 // unknown-kind extras the frontend filters out of the table.
@@ -285,7 +341,9 @@ db.exec(`
     exist_foil INTEGER,
     highest_foil_condition REAL,
     pull_rate_pct REAL NOT NULL,
-    one_in_x REAL
+    one_in_x REAL,
+    full_art INTEGER NOT NULL DEFAULT 0,
+    full_art_path TEXT
   );
   CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
   CREATE INDEX idx_cards_rarity ON cards(rarity);
@@ -297,15 +355,15 @@ const insert = db.prepare(`
   INSERT INTO cards (name, kind, rarity, score, foil_score, labels, collections, tags, variants, examine,
                      image_path, wiki, pulled_normal, pulled_foil, pulled,
                      exist_normal, exist_foil, highest_foil_condition,
-                     pull_rate_pct, one_in_x)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     pull_rate_pct, one_in_x, full_art, full_art_path)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 for (const r of allRows) {
   insert.run(
     r.name, r.kind, r.rarity, r.score, r.foilScore, r.labels, JSON.stringify(r.collections), JSON.stringify(r.tags), r.variants, r.examine,
     r.imagePath, r.wiki, r.pulledNormal, r.pulledFoil, r.pulled,
     r.existNormal, r.existFoil, r.highestFoilCondition,
-    r.pullRatePct, r.oneInX,
+    r.pullRatePct, r.oneInX, r.fullArt, r.fullArtPath,
   );
 }
 
@@ -353,6 +411,8 @@ const frontendData = {
     tags: r.tags,
     imagePath: r.imagePath,
     wiki: r.wiki,
+    fullArt: r.fullArt,
+    fullArtPath: r.fullArtPath,
   })),
 };
 await writeFile(

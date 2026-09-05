@@ -9,7 +9,7 @@
 //
 // Usage: node fetch-art.mjs
 
-import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -103,13 +103,144 @@ async function worker() {
 
 await Promise.all(Array.from({ length: CONCURRENCY }, worker));
 
+// ---- full-art mirror (community full-art versions, art/full/<ULID>.<ext>) ----
+// Real extension per file (sniffed): uploads are not all PNGs. build.mjs
+// probes for the actual file, so the two never disagree.
+// URL list: read raw_circulation.json, apply the official predicate per entry
+// (pulledFoil > 0 + non-empty foilImagePath; no case-merge needed for the
+// download list), dedupe by ULID. Fetch BASE + foilImagePath verbatim.
+// ULID regex duplicated from build.mjs (separate processes; build.mjs
+// executes on import so one cannot import the other).
+const circulation = JSON.parse(await readFile(path.join(HERE, "raw_circulation.json"), "utf8"));
+const fullArtByUlid = new Map(); // ULID -> signed foilImagePath (first wins)
+for (const stats of Object.values(circulation.cards ?? {})) {
+  if (!(Number(stats.pulledFoil) > 0)) continue;
+  if (typeof stats.foilImagePath !== "string" || stats.foilImagePath.trim() === "") continue;
+  const m = /\/files\/([A-Za-z0-9]+)/.exec(stats.foilImagePath);
+  if (!m) continue;
+  if (!fullArtByUlid.has(m[1])) fullArtByUlid.set(m[1], stats.foilImagePath);
+}
+
+// Community uploads are not all PNGs (phone-photo JPEGs seen in the wild),
+// so the mirror keeps each file's real extension. List duplicated in
+// build.mjs (separate processes; build.mjs executes on import so one cannot
+// import the other) - the build's existence gate probes these in order.
+const FULL_ART_EXTS = ["png", "jpg", "jpeg", "webp", "gif"];
+
+async function existingFullArt(ulid) {
+  for (const ext of FULL_ART_EXTS) {
+    const p = path.join(ART_DIR, "full", `${ulid}.${ext}`);
+    try {
+      const st = await stat(p);
+      return { path: p, mtimeMs: st.mtimeMs };
+    } catch { /* try next extension */ }
+  }
+  return null;
+}
+
+// Sniff the real image type: Content-Type first, magic bytes as fallback
+// (upstream has served both correctly and incorrectly labeled bytes).
+function sniffFullArtExt(res, buf) {
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  if (ct.includes("png")) return "png";
+  if (ct.includes("jpeg") || ct.includes("jpg")) return "jpg";
+  if (ct.includes("webp")) return "webp";
+  if (ct.includes("gif")) return "gif";
+  if (buf[0] === 0x89 && buf[1] === 0x50) return "png";
+  if (buf[0] === 0xff && buf[1] === 0xd8) return "jpg";
+  if (buf.toString("latin1", 0, 4) === "RIFF" && buf.toString("latin1", 8, 12) === "WEBP") return "webp";
+  if (buf.toString("latin1", 0, 6).startsWith("GIF8")) return "gif";
+  return "png"; // last resort preserves the historical behavior
+}
+
+async function downloadFullArt(ulid, foilImagePath) {
+  const existing = await existingFullArt(ulid);
+  if (existing && Date.now() - existing.mtimeMs < REVALIDATE_AFTER_MS) {
+    return { status: "skipped", rel: path.relative(HERE, existing.path).replace(/\\/g, "/") };
+  }
+
+  // Fetch verbatim (no ?cb=: the weekly-rotating token already busts caches,
+  // and an extra query risks signature invalidation). downloadFile maps
+  // destinations via imagePath.replace(/^\/images\/?/,...) and appends ?cb=,
+  // so it must NOT be reused here: ?token= would land in the filename.
+  const url = `${BASE}${foilImagePath}`;
+  let lastErr;
+  for (let attempt = 1; attempt <= RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: HEADERS,
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!res.ok) {
+        const err = new Error(`${url} -> HTTP ${res.status}`);
+        err.retryable = res.status === 403 || res.status === 429 || res.status >= 500;
+        throw err;
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      const dest = path.join(ART_DIR, "full", `${ulid}.${sniffFullArtExt(res, buf)}`);
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(dest, buf);
+      // Drop the orphan when a re-upload changed formats (e.g. png -> jpg).
+      if (existing && existing.path !== dest) await rm(existing.path, { force: true });
+      return { status: existing ? "refreshed" : "downloaded", rel: path.relative(HERE, dest).replace(/\\/g, "/") };
+    } catch (err) {
+      lastErr = err;
+      const retryable =
+        err.retryable || err.name === "TimeoutError" || err.name === "AbortError" ||
+        err.cause?.code === "ECONNRESET" || err.cause?.code === "ETIMEDOUT";
+      if (!retryable || attempt === RETRIES) throw err;
+      await sleep(BASE_DELAY_MS * 2 ** (attempt - 1));
+    }
+  }
+  throw lastErr;
+}
+
+const fullArtEntries = [...fullArtByUlid.entries()];
+let fullDownloaded = 0, fullRefreshed = 0, fullSkipped = 0;
+const fullFailures = [];
+const fullArtActual = []; // real mirror paths (with sniffed extensions)
+let fullNext = 0;
+
+async function fullWorker() {
+  while (fullNext < fullArtEntries.length) {
+    const [ulid, foilImagePath] = fullArtEntries[fullNext++];
+    try {
+      const { status, rel } = await downloadFullArt(ulid, foilImagePath);
+      fullArtActual.push(rel);
+      if (status === "downloaded") fullDownloaded++;
+      else if (status === "refreshed") fullRefreshed++;
+      else fullSkipped++;
+    } catch (err) {
+      fullFailures.push(`art/full/${ulid}.*: ${err.message}`);
+    }
+  }
+}
+
+await Promise.all(Array.from({ length: CONCURRENCY }, fullWorker));
+
 await writeFile(
   path.join(HERE, "art-manifest.json"),
-  JSON.stringify({ generatedAt: new Date().toISOString(), imagePaths }, null, 2),
+  JSON.stringify(
+    {
+      generatedAt: new Date().toISOString(),
+      imagePaths,
+      fullArtPaths: [...fullArtActual].sort(),
+    },
+    null,
+    2,
+  ),
 );
 
 console.log(
   `art: ${downloaded} downloaded, ${refreshed} refreshed, ${skipped} already present, ${failures.length} failed` +
     (failures.length ? `\n${failures.slice(0, 10).join("\n")}` : ""),
 );
+console.log(
+  `full-art: ${fullDownloaded} downloaded, ${fullRefreshed} refreshed, ${fullSkipped} already present, ${fullFailures.length} failed of ${fullArtEntries.length} expected` +
+    (fullFailures.length ? `\n${fullFailures.slice(0, 10).join("\n")}` : ""),
+);
 if (failures.length) process.exit(2);
+// Full-art failures only log and continue - EXCEPT the run exits 2 when the
+// failure rate exceeds 20% of expected (covers total outages: token rotation,
+// CORP change, endpoint death). expected === 0 never exits.
+if (fullArtEntries.length > 0 && fullFailures.length / fullArtEntries.length > 0.2) process.exit(2);
