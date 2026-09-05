@@ -189,7 +189,15 @@ function placeMenu(btn, menu) {
   menu.style.maxHeight = Math.max(140, window.innerHeight - r.bottom - 16) + 'px';
 }
 function closeMenus() { for (const { menu } of Object.values(msEls)) menu.hidden = true; }
-window.addEventListener('scroll', closeMenus, true);
+// capture phase (so tablewrap/page scrolls close menus), but a scroll that
+// starts INSIDE an open menu - e.g. scrolling the tall Tags list - must not
+// close the menu being scrolled
+window.addEventListener('scroll', (e) => {
+  for (const { menu } of Object.values(msEls)) {
+    if (!menu.hidden && menu.contains(e.target)) return;
+  }
+  closeMenus();
+}, true);
 window.addEventListener('resize', closeMenus);
 function toggleTier(t) { sel.tier.has(t) ? sel.tier.delete(t) : sel.tier.add(t); syncMS('tier'); render(); }
 
