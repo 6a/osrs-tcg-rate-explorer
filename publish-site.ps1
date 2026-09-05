@@ -18,6 +18,8 @@ try {
   Pop-Location
 
   Copy-Item C:\tcg-rates\index.html C:\tcg-site\index.html -Force
+  Copy-Item C:\tcg-rates\styles.css C:\tcg-site\styles.css -Force
+  Copy-Item C:\tcg-rates\app.js C:\tcg-site\app.js -Force
   Copy-Item C:\tcg-rates\data.js C:\tcg-site\data.js -Force
   New-Item -ItemType Directory -Force C:\tcg-site\.github\workflows | Out-Null
   Copy-Item C:\tcg-rates\.github\workflows\deploy-site.yml C:\tcg-site\.github\workflows\deploy-site.yml -Force
@@ -25,7 +27,7 @@ try {
   if ($LASTEXITCODE -ge 8) { throw "robocopy failed ($LASTEXITCODE)" }
 
   Push-Location C:\tcg-site
-  git add index.html data.js .github art
+  git add index.html styles.css app.js data.js .github art
   git commit --amend -m "site data $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
   if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne 1)) { throw "commit failed ($LASTEXITCODE)" }
   git push -f origin site
