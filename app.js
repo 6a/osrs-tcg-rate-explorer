@@ -171,7 +171,11 @@ document.addEventListener('click', () => { for (const { menu } of Object.values(
 // close them on any scroll/resize, when the anchor would otherwise drift away
 function placeMenu(btn, menu) {
   const r = btn.getBoundingClientRect();
-  menu.style.width = Math.max(0, Math.min(r.width, window.innerWidth - 16)) + 'px';
+  // pin both width AND min-width: the stylesheet's 190px floor would
+  // otherwise override narrow buttons (e.g. Type) and break the match
+  const w = Math.max(0, Math.min(r.width, window.innerWidth - 16)) + 'px';
+  menu.style.width = w;
+  menu.style.minWidth = w;
   menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
   menu.style.top = (r.bottom + 4) + 'px';
   menu.style.maxHeight = Math.max(140, window.innerHeight - r.bottom - 16) + 'px';
