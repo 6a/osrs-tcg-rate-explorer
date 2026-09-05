@@ -142,7 +142,11 @@ for (const def of MS_DEFS) {
     menu.hidden = !menu.hidden;
     if (!menu.hidden) placeMenu(btn, menu);
   });
-  root.append(btn, menu);
+  root.append(btn);
+  // menus live on <body>, not inside .panel: the panel's drop-shadow filter
+  // would otherwise capture fixed positioning (any non-none filter becomes
+  // the containing block), misplacing every menu by the panel's own offset
+  document.body.appendChild(menu);
   msEls[def.id] = { btn, menu };
   syncMS(def.id);
 }
@@ -162,11 +166,12 @@ function syncMS(id) {
   for (const opt of menu.children) opt.classList.toggle('is-selected', chosen.has(opt.dataset.v));
 }
 document.addEventListener('click', () => { for (const { menu } of Object.values(msEls)) menu.hidden = true; });
-// menus float fixed-positioned, so anchor each one to its button rect on open
-// (clamped into the viewport) and close them on any scroll/resize, when the
-// anchor would otherwise drift away from the button
+// menus float fixed-positioned from <body>, so anchor each one to its button
+// rect on open (same width as the button, clamped into the viewport) and
+// close them on any scroll/resize, when the anchor would otherwise drift away
 function placeMenu(btn, menu) {
   const r = btn.getBoundingClientRect();
+  menu.style.width = Math.max(0, Math.min(r.width, window.innerWidth - 16)) + 'px';
   menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - menu.offsetWidth - 8)) + 'px';
   menu.style.top = (r.bottom + 4) + 'px';
   menu.style.maxHeight = Math.max(140, window.innerHeight - r.bottom - 16) + 'px';

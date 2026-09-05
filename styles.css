@@ -160,8 +160,9 @@
   .tri { display: inline-block; width: 10px; height: 7px; margin-left: .35rem; vertical-align: baseline; }
   .tri.up { transform: rotate(180deg); }
   /* fixed (not absolute): the panel's bevel clip-path would cut off any menu
-     taller than the space below its button, so menus are positioned from the
-     button rect in JS and float above everything instead */
+     taller than the space below its button, and its drop-shadow filter would
+     capture fixed positioning - so menus live on <body> and are anchored to
+     the button rect in JS instead */
   .mselect__menu {
     position: fixed; top: 0; left: 0; z-index: 30;
     min-width: 190px; max-height: 420px; overflow: auto;
