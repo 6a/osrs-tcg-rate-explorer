@@ -22,10 +22,16 @@
     color-scheme: dark;
   }
   * { box-sizing: border-box; }
+  html, body { height: 100%; }
   body {
     font-family: var(--font-ui); color: var(--rl-text); margin: 0; line-height: 1.35;
     background-color: #0a0a0a;
     -webkit-font-smoothing: antialiased;
+    /* app shell: exactly one viewport, never a page scrollbar - the table
+       scrolls internally and absorbs all leftover height */
+    height: 100vh; height: 100dvh;
+    overflow: hidden;
+    display: flex; flex-direction: column;
   }
   /* background as a fixed-position layer, NOT background-attachment: fixed -
      Gecko repaints attachment:fixed backgrounds on every scroll frame (page-
@@ -40,23 +46,31 @@
     display: flex; align-items: center; justify-content: space-between;
     padding: .45rem 1rem; background: color-mix(in srgb, var(--page-base) 88%, transparent);
     border-bottom: 1px solid var(--panel-border);
-    position: sticky; top: 0; z-index: 10; backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    flex: none;
   }
   .logo { font-weight: 800; font-size: 1.05rem; letter-spacing: .02em; user-select: none; }
   .logo .gold { color: var(--rl-select); }
   .logo .white { color: #fff; }
   .chamfer { clip-path: polygon(var(--ch) 0, calc(100% - var(--ch)) 0, 100% var(--ch), 100% calc(100% - var(--ch)), calc(100% - var(--ch)) 100%, var(--ch) 100%, 0 calc(100% - var(--ch)), 0 var(--ch)); }
-  .main { max-width: 1600px; margin: 1.25rem auto 2rem; padding: 0 .75rem; }
+  .main {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    width: 100%; max-width: 1600px; margin: 0 auto; padding: .75rem .75rem;
+  }
   .panel {
     --ch: var(--panel-chamfer);
     background: var(--panel-border);
     border: 0;
     box-shadow: none;
     filter: drop-shadow(0 14px 34px #0000006b);
-    padding: 1px 0 1rem;
+    padding: 1px 0 .75rem;
     position: relative;
     isolation: isolate;
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
   }
+  .panel__titlebar, .stats, .controls { flex: none; }
   /* inner fill inset by the 1px frame, with a matching smaller bevel */
   /* inner fill inset by the 1px frame: official .ui-panel::after glass fill
      (base color + 345deg gradient) rendered at --panel-glass-opacity .66, so
@@ -187,7 +201,7 @@
   .mselect__opt.is-selected .box { background: var(--rl-select); border-color: var(--rl-select); color: #1c1a17; font-weight: 700; }
   .mselect__count { margin-left: auto; font-size: .72rem; color: var(--rl-muted); }
   .mselect__group { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--rl-muted); padding: .4rem .5rem .1rem; }
-  .tablewrap { overflow: auto; max-height: calc(100vh - 260px); border-top: 1px solid var(--panel-border); scrollbar-gutter: stable; }
+  .tablewrap { flex: 1; min-height: 0; overflow: auto; border-top: 1px solid var(--panel-border); scrollbar-gutter: stable; }
   /* rows sit directly on the glass panel fill (official tables do the same -
      their wrapper carries --panel-glass-opacity and nothing else behind them);
      the sticky header stays solid so scrolled rows never show through */
@@ -252,8 +266,9 @@
      aspect automatically (70vh cap still applies) */
   #preview.is-fullart img { max-width: 250px; }
   .site-footer {
+    flex: none;
     text-align: center; color: var(--rl-muted); font-size: .75rem;
-    border-top: 1px solid var(--panel-border); padding: .5rem; margin-top: 1rem;
+    border-top: 1px solid var(--panel-border); padding: .5rem;
   }
   .faq-btn {
     display: inline-flex; align-items: center; justify-content: center;
