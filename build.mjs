@@ -41,6 +41,19 @@ const totalPulled = [...circMerged.values()].reduce(
   0,
 );
 
+// Official headline totals: packs opened comes from packs/stats, and the
+// official site reports cards pulled as packs x 5 (every pack yields 5 cards).
+// Per-card circulation no longer counts cards sold back for credits or
+// otherwise removed, so its sum runs lower - headline uses the official
+// counter, per-card rates keep the per-card sum as their denominator.
+const CARDS_PER_PACK = 5;
+let packsOpened = null;
+try {
+  const packs = JSON.parse(await readFile(path.join(HERE, "raw_packs.json"), "utf8"));
+  if (Number.isFinite(packs.totalOpened)) packsOpened = packs.totalOpened;
+} catch {}
+const officialPulled = packsOpened != null ? packsOpened * CARDS_PER_PACK : null;
+
 // Official osrs-tcg.net tag filter groups (mirrors their tag dropdown).
 // Generated here at gather time: each card gets its normalized official
 // labels, and the group structure is embedded in data.js for the frontend.
@@ -239,6 +252,7 @@ runHour.setUTCMinutes(0, 0, 0);
 const generatedAt = runHour.toISOString();
 meta.run("generatedAt", generatedAt);
 meta.run("totalPulled", String(totalPulled));
+meta.run("packsOpened", packsOpened == null ? "" : String(packsOpened));
 meta.run("catalogVersion", circulation.partial === undefined ? "" : "");
 db.exec("DELETE FROM meta WHERE value = ''");
 db.close();
@@ -247,6 +261,8 @@ db.close();
 const frontendData = {
   generatedAt,
   totalPulled,
+  packsOpened,
+  officialPulled,
   tagGroups: TAG_GROUPS,
   cards: allRows.map((r) => ({
     name: r.name,

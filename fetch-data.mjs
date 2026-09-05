@@ -86,6 +86,18 @@ const catalog = await getJson("catalog/cards/live");
 const circulation = await getJson("catalog/circulation");
 warnIfStale(circulation);
 
+// Official headline counters (packs opened; the site reports cards pulled as
+// packs x 5). Non-fatal: the build falls back to per-card sums when missing.
+let packs = { totalOpened: null, generatedAt: null };
+try {
+  const ps = await getJson("packs/stats");
+  packs = { totalOpened: ps.totalOpened ?? null, generatedAt: ps.generatedAt ?? null };
+  console.log(`packs/stats: totalOpened=${packs.totalOpened} generatedAt=${packs.generatedAt}`);
+} catch (err) {
+  console.log(`packs/stats unavailable (${err.message}) - build will fall back to per-card sums`);
+}
+await writeFile(path.join(OUT_DIR, "raw_packs.json"), JSON.stringify(packs, null, 2));
+
 await writeFile(
   path.join(OUT_DIR, "raw_catalog.json"),
   JSON.stringify(catalog, null, 2),
