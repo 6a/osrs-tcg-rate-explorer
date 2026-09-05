@@ -97,7 +97,7 @@
   input { flex: 1; min-width: 220px; }
   input::placeholder { color: var(--input-placeholder); }
   input:focus, select:focus, .mselect__btn:focus { outline: none; }
-  select:hover, .mselect__btn:hover { background: var(--control-face-hover); }
+  select:hover { background: var(--control-face-hover); }
   .mselect { position: relative; }
   .mselect__btn { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: transform .06s ease-out, filter .06s ease-out; }
   .mselect__btn:active { transform: translateY(1px); filter: brightness(.82); }
@@ -128,7 +128,10 @@
   #search { flex: 1; width: 100%; min-width: 0; background: transparent; border: 0; position: relative; z-index: 1; }
   .mselect__btn:hover, .faq-btn:hover, .modal__close:hover, .search-wrap:hover { --ui-face: var(--control-face-hover); }
   .mselect__btn.has-sel { --ui-edge-color: var(--rl-select); }
-  .mselect__btn:focus, .faq-btn:focus, .modal__close:focus {
+  /* :focus-visible (not :focus): a mouse click leaves focus on the button,
+     so :focus would glue the gold "clicked" edge on after the mouse leaves.
+     Keyboard tabbing still gets the ring. */
+  .mselect__btn:focus-visible, .faq-btn:focus-visible, .modal__close:focus-visible {
     --ui-edge-color: var(--rl-select);
     filter: drop-shadow(0 0 4px color-mix(in srgb, var(--rl-select) 55%, transparent));
     outline: none;
