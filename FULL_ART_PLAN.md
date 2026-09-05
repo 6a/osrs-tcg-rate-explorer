@@ -1,13 +1,13 @@
-# Full-Art Stars — Implementation Plan
+# Full-Art Stars - Implementation Plan
 
-Status: VALID — approved by independent review round 5 (zero blocking issues; 3 nits folded in). Ready for implementation.
+Status: VALID - approved by independent review round 5 (zero blocking issues; 3 nits folded in). Ready for implementation.
 
 ## 1. Goal
 
 Per table row, show a gold star (★) next to the Item/NPC kind tag when a
 community full-art version of that card exists. Hovering the star shows the
 full art in the hover preview. Everything is derived hourly from public
-upstream data — no hardcoded card lists, ever.
+upstream data - no hardcoded card lists, ever.
 
 ## 2. Verified facts (two independent probes, 2026-09-05)
 
@@ -24,22 +24,22 @@ upstream data — no hardcoded card lists, ever.
   "/api/v1/artwork/files/01M0VVM1Z4H3X9CGYY616WQZDR?token=MTc4OTIwMjE1Mw...."}`.
 - Count today: **146 of 5,209** circulation entries.
 - Only *pulled* full arts surface (predicate requires `pulledFoil > 0`), so
-  the set grows as new arts get pulled — matches the expected dynamic
+  the set grows as new arts get pulled - matches the expected dynamic
   behavior. Unpulled approved arts are invisible to us (accepted limitation,
   documented in FAQ).
 - Image URL form: `https://osrs-tcg.net/api/v1/artwork/files/<ULID>?token=<exp>.<sig>`
   (`<exp>` = base64 expiry, ~7 days). Tokenless fetch →
-  `artwork_file_forbidden`. Full bytes: `image/png` (~40–75 KB).
+  `artwork_file_forbidden`. Full bytes: `image/png` (~40-75 KB).
   `Cache-Control: private, max-age=86400`.
 - `GET /api/v1/catalog/card-art` is a documented stub (`cards` always `{}`).
   No all-time-foil/total-art endpoint exists (~60 guessed routes 404).
 - A public per-artist endpoint exists
   (`GET /api/v1/artwork/artists/:name`, no auth) but enumerating artists
-  dynamically is unsolved — NOT used by this plan (circulation covers all
+  dynamically is unsolved - NOT used by this plan (circulation covers all
   pulled arts, which is the feature's definition).
 - Same-origin rule (already established for card art): osrs-tcg.net sends
   `Cross-Origin-Resource-Policy: same-site`, so we must mirror bytes, never
-  hotlink — doubly so here because tokens expire weekly.
+  hotlink - doubly so here because tokens expire weekly.
 
 ## 3. Data flow (hourly, existing pipeline stages)
 
@@ -50,10 +50,10 @@ fetch-data.mjs          NO CHANGE (circulation already fetched; foilImagePath ri
 raw_circulation.json    already contains foilImagePath per card (signed, ~7d life)
       |
       +---> build.mjs ──> data.js: per-row { fullArt: 0/1, fullArtPath: "art/full/<ULID>.png"|null }
-      |                   (local mirror path only — NEVER the signed URL: data.js is
+      |                   (local mirror path only - NEVER the signed URL: data.js is
       |                    long-cached and public, tokens die in ~7 days)
       |                   CLOSED LOOP: build forces fullArt=0 when the mirror file
-      |                   is absent (see §4.1) — a star can never point at a 404.
+      |                   is absent (see §4.1) - a star can never point at a 404.
       |                   Cost: brand-new arts appear one hourly run later.
       |
       +---> fetch-art.mjs ──> art/full/<ULID>.png  (downloaded with the fresh token)
@@ -64,7 +64,7 @@ index.html/app.js       gold ★ next to kind tag iff fullArt; hover swaps previ
 
 NOTE on pipeline order: `publish-site.ps1` runs build BEFORE fetch-art.
 The existence gate above is what makes that order safe (stars only for
-bytes already mirrored). Do NOT reorder the pipeline to "fix" this — the
+bytes already mirrored). Do NOT reorder the pipeline to "fix" this - the
 gate is the fix.
 
 ## 4. File-by-file changes
@@ -77,11 +77,11 @@ gate is the fix.
   must not lose the star). Predicate runs on merged `pulledFoil` + merged path.
 - In `rowFrom(e, stats)`, compute from `stats` (and, for split-tracked NPC
   rows, from the resolved `npc:{id}` entry the same way `highestFoilCondition`
-  is resolved today — hook art off that same re-resolved `stats` object):
+  is resolved today - hook art off that same re-resolved `stats` object):
   `fullArt = (stats.pulledFoil > 0 && typeof stats.foilImagePath === "string" && stats.foilImagePath.trim() !== "") ? 1 : 0`
 - `fullArtPath = fullArt ? "art/full/<ULID>.png" : null`, where ULID is
   extracted via `/\/files\/([A-Za-z0-9]+)/` on `foilImagePath`. If the regex
-  misses, `fullArt = 0` (fail closed — no star pointing at a bad URL).
+  misses, `fullArt = 0` (fail closed - no star pointing at a bad URL).
 - SQLite: add `full_art INTEGER NOT NULL DEFAULT 0`, `full_art_path TEXT`
   columns (+ include in INSERT).
 - `frontendData.cards[]`: add `fullArt`, `fullArtPath`.
@@ -95,16 +95,16 @@ gate is the fix.
   nothing; on a first-ever run (empty mirror) no stars render and they appear
   from the next hourly run onward. PLACEMENT IS LOAD-BEARING: the gate must
   run immediately after `const allRows = ...sort(...)` and BEFORE
-  `totalExistCards`, the SQLite INSERTs, and `frontendData` — anywhere later
-  leaves dangling stars in the DB/`data.js`. Do NOT reorder the pipeline —
+  `totalExistCards`, the SQLite INSERTs, and `frontendData` - anywhere later
+  leaves dangling stars in the DB/`data.js`. Do NOT reorder the pipeline -
   the gate is the fix.
 - `extraRows` (unknown-kind): apply the same computation (harmless; the
   frontend filters those rows from the table anyway). NOTE: `extraRows`
-  builds its row literal inline and bypasses `rowFrom` — duplicate the
+  builds its row literal inline and bypasses `rowFrom` - duplicate the
   fullArt/fullArtPath computation there explicitly.
 
-### 4.2 `fetch-art.mjs` — separate branch (do NOT reuse `downloadFile` as-is)
-- URL-list wiring (stated explicitly — the implementer must add this):
+### 4.2 `fetch-art.mjs` - separate branch (do NOT reuse `downloadFile` as-is)
+- URL-list wiring (stated explicitly - the implementer must add this):
   read `raw_circulation.json`, apply the §4.1 predicate per entry
   (`pulledFoil > 0` + non-empty `foilImagePath`; no case-merge needed for the
   download list), dedupe by ULID. Fetch `BASE + foilImagePath` verbatim.
@@ -121,9 +121,9 @@ gate is the fix.
   check (weekly re-downloads pick up replaced artworks for free).
 - **Failure semantics must split**: base-art failures keep `process.exit(2)`
   (publish aborts on `$LASTEXITCODE -ne 0`). Full-art failures only log and
-  continue — EXCEPT the run exits 2 when `failures / expected > 0.2`, with
+  continue - EXCEPT the run exits 2 when `failures / expected > 0.2`, with
   an explicit `expected === 0 → no exit` guard (covers total outages: token
-  rotation, CORP change, endpoint death — without it a 100% failure still
+  rotation, CORP change, endpoint death - without it a 100% failure still
   logs `OK - site pushed` while serving week-stale bytes that never
   refresh).
   Expected count comes from the §4.1 predicate over the just-fetched
@@ -137,7 +137,7 @@ gate is the fix.
   `<span class="fastar" data-fullsrc="<fullArtPath>" title="Full art available">★</span>`
   iff `c.fullArt`. Escape `fullArtPath` with the existing `escapeAttr`.
 - CSS (exact): `.fastar { color: #F2C94C; cursor: help; margin-left: .4rem; font-size: .84rem; font-weight: 400; }`
-  (same size as the name cell, regular weight — the measurement below uses
+  (same size as the name cell, regular weight - the measurement below uses
   these exact values).
 - **Column widths**: `lockColumnWidths` measures the name cell under
   `table-layout: fixed` + ellipsis clipping, so the star MUST be measured
@@ -149,7 +149,7 @@ gate is the fix.
   tag-present/absent branch). The falsy `c.fullArt` ternary keeps stale
   payloads without the field measuring exactly as today. Re-verified by the
   existing `document.fonts.ready` re-lock with no change needed there.
-- **Hover** (null-safe, fully generalized — the current code assumes the
+- **Hover** (null-safe, fully generalized - the current code assumes the
   card-art trigger only). Mouseover delegation:
   `const trig = e.target.closest('.icon-slot,.fastar'); if (!trig) return;`
   `const src = trig.dataset.src || trig.dataset.fullsrc; if (!src) return;`
@@ -170,7 +170,7 @@ gate is the fix.
 
 ### 4.4 `publish-site.ps1` / server `publish.ps1`
 - `robocopy art /E` + `git add art` already cover a new `art/full/`
-  subtree — BUT this repo's `.gitignore` contains `art/`, so a one-time
+  subtree - BUT this repo's `.gitignore` contains `art/`, so a one-time
   manual check is not enough (silent success shapes: `git add` on an
   ignored path adds nothing yet exits 0, then amend+push succeed shipping
   `data.js` paths with zero bytes). Add a fail-closed guard in
@@ -182,7 +182,7 @@ gate is the fix.
   unless `git ls-files --cached art/full` is non-empty AND
   `git check-ignore -q` reports the files NOT ignored (`check-ignore -q`
   signals via exit code: in PowerShell, `$LASTEXITCODE -eq 1` means NOT
-  ignored — that is the passing condition; pass it a concrete mirrored
+  ignored - that is the passing condition; pass it a concrete mirrored
   file, e.g. the first `fullArtPath` from the just-built `data.js`, not
   the bare directory). Run the
   `check-ignore`/`ls-files` verification on the server before the first
@@ -199,14 +199,14 @@ gate is the fix.
 | 4 | Case-variant keys (`Hoop Snake` vs `Hoop snake`) | First-non-empty-wins on merge; same card ⇒ same art. |
 | 5 | Split item/NPC rows (`npc:{id}`) | Resolve art from the same stats object the row's counts come from. |
 | 6 | Unknown-kind extra rows | Computed but never rendered (frontend filters them). No special handling. |
-| 7 | Art download fails, partial or total (403/404 mid-rotation up to full outage) | Logged; run continues unless the full-art failure rate exceeds 20% of expected — at 100% (token rotation, CORP change, endpoint death) exit 2 makes publish abort loud instead of serving week-stale bytes forever. A row whose file is missing renders no star at all (existence gate), and hover `onerror` hides the preview as backstop. |
+| 7 | Art download fails, partial or total (403/404 mid-rotation up to full outage) | Logged; run continues unless the full-art failure rate exceeds 20% of expected - at 100% (token rotation, CORP change, endpoint death) exit 2 makes publish abort loud instead of serving week-stale bytes forever. A row whose file is missing renders no star at all (existence gate), and hover `onerror` hides the preview as backstop. |
 | 8 | Stale cached `data.js` (no new fields) | No stars render. No throw (existing guard + falsy checks). |
 | 9 | Rate limits | Circulation already fetched hourly (limit 120); +~146 small files on first run, then missing/7d-old only, at concurrency 10. |
-| 10 | `&variant=thumb` | NOT used: full PNG (~40–75 KB × 146 ≈ ≤11 MB mirror) is fine and avoids a second code path. Revisit if mirror size becomes a concern. |
+| 10 | `&variant=thumb` | NOT used: full PNG (~40-75 KB × 146 ≈ ≤11 MB mirror) is fine and avoids a second code path. Revisit if mirror size becomes a concern. |
 | 11 | Stale `data.js` reads | Every new read (`c.fullArt`, `c.fullArtPath`) falsy-guarded; `escapeAttr` called only when a path is present. FAQ star paragraph renders regardless (harmless with zero stars). |
 
 ## 6. Testing (extends the jsdom harness at
-`C:\Users\james\AppData\Local\Temp\opencode\jsdomtest\test.js` — scratch
+`C:\Users\james\AppData\Local\Temp\opencode\jsdomtest\test.js` - scratch
 tooling, NOT committed to the repo; run with `node test.js` in that
 directory after `npm install jsdom` there; it rebuilds fixture pages from
 the repo on every run)
@@ -217,32 +217,32 @@ the repo on every run)
   (the existence gate nulls flags when the mirror is empty): derive ULIDs
   from `raw_circulation.json` via the §4.1 predicate BEFORE building, then
   `New-Item -ItemType File -Force art/full/<ULID>.png` per ULID (repo has
-  no `art/` dir — bare `New-Item` will not create missing parents), THEN
+  no `art/` dir - bare `New-Item` will not create missing parents), THEN
   run the local `node build.mjs`, then assert star count > 0. (Deriving
-  ULIDs from the just-built `data.js` would be circular — the gate would
+  ULIDs from the just-built `data.js` would be circular - the gate would
   already have nulled them.)
 - Stale fixtures: build a dedicated stale-C WITHOUT `fullArt`/`fullArtPath`
   on any card (deleting `tagGroups` alone is no longer sufficient, since
   implemented `data.js` carries the art fields) → zero stars, zero errors.
   Keep the existing stale-A (no `PULL_DATA`) guard-message verdict.
 - Column-width fit for starred rows CANNOT be asserted headless (no layout
-  engine) — verify visually once in a real browser that ★ never clips or
+  engine) - verify visually once in a real browser that ★ never clips or
   ellipsizes the name cell.
-- Syntax: `node --check` verifies exactly ONE file per invocation — run
+- Syntax: `node --check` verifies exactly ONE file per invocation - run
   once per file (`node --check app.js`, `node --check build.mjs`,
   `node --check fetch-art.mjs`), never as a multi-arg single call; plus CSS
   brace balance.
 - Pre-push local `node build.mjs` against local raw files to validate new
   fields end-to-end (gitignored artifacts, server rebuilds fresh).
 - Post-deploy: live `data.js` range-check for `"fullArt":1` entries (with
-  quotes — strip the `window.PULL_DATA = ...;` wrapper and `JSON.parse`
+  quotes - strip the `window.PULL_DATA = ...;` wrapper and `JSON.parse`
   the payload, then count `cards.filter(c =>
   c.fullArt === 1).length` is preferred over substring matching); live
   `app.js` contains `fastar`; spot-check one `art/full/<ULID>.png` URL
   returns 200. Follows the established verify pattern.
 - The harness writes `bi_*.html`/`stalA.js` fixtures into the repo dir on
   every run: add TWO lines to the repo `.gitignore` (`bi_*.html` on one
-  line, `stalA.js` on the next — a single space-separated line matches
+  line, `stalA.js` on the next - a single space-separated line matches
   nothing) so fixtures can never be committed.
 
 ## 7. Rollout
@@ -250,7 +250,7 @@ the repo on every run)
 0. Pre-flight on the server: `git check-ignore -v art/full/<ULID>.png`
    and `git ls-files art | Select-Object -First 10` in the `site`-branch
    checkout (feeds the §4.4 guard design; do not skip). NOTE: this is
-   PowerShell — no Unix `| head`.
+   PowerShell - no Unix `| head`.
 1. Implement §4 (code only, no manual data).
 2. Full harness green + syntax clean.
 3. Commit + push `main`.
@@ -259,7 +259,7 @@ the repo on every run)
 5. Verify per §6; confirm `art/full/` landed in the site branch.
 6. Steady state: no action needed. New art BYTES land via `fetch-art` in
    the hour they are discovered, but (build-before-fetch + existence gate)
-   the star itself renders starting from the NEXT hourly `build` — a
+   the star itself renders starting from the NEXT hourly `build` - a
    locked-in one-run delay, not same-run.
 
 ## 8. Explicit non-goals

@@ -50,10 +50,12 @@ document.getElementById('foil-bounds').textContent =
 document.getElementById('unowned').textContent =
   D.totalExistCards != null ? (D.totalPulled - D.totalExistCards).toLocaleString() : 'unknown';
 
+const fullArtCount = D.cards.reduce((s, c) => s + (c.fullArt ? 1 : 0), 0);
 document.getElementById('stats').innerHTML = `
   <div class="stat chamfer-sm"><b>${D.cards.length.toLocaleString()}</b><span>cards</span></div>
   <div class="stat chamfer-sm"><b>${(D.officialPulled ?? D.totalPulled).toLocaleString()}</b><span>total card pulls</span></div>
   <div class="stat chamfer-sm"><b>${foilSum.toLocaleString()}</b><span>foil pulls</span></div>` +
+  (fullArtCount > 0 ? `<div class="stat chamfer-sm"><b>${fullArtCount.toLocaleString()}</b><span>full art cards</span></div>` : '') +
   (D.packsOpened != null ? `<div class="stat chamfer-sm"><b>${D.packsOpened.toLocaleString()}</b><span>packs opened</span></div>` : '') +
   (D.totalExistCards != null ? `<div class="stat chamfer-sm"><b>${D.totalExistCards.toLocaleString()} / ${D.totalExistFoils.toLocaleString()}</b><span>cards / foils in circulation</span></div>` : '');
 
