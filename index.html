@@ -350,7 +350,7 @@
     <p>The stats are a reflection of the <b>publicly available live data</b>, which may differ from the actual server-side values (the API can serve cached snapshots, and we only see what it exposes). All we have is that public reflection. That said, by the <b>law of large numbers</b> the relative stats - pull rate %, 1-in-X - should become more accurate over time as the total number of recorded pulls grows.</p>
     <h3>How the odds are calculated</h3>
     <p><b>Pull rate %</b> = this card's total pulls (normal + foil) &divide; all card pulls, as a percentage. <b>1 in X</b> = total pulls across all cards &divide; this card's pulls - i.e. on average, roughly 1 in X pulls yields this card. These are observed frequencies from the public data, not official pack odds (which aren't published).</p>
-    <p>The headline <b>packs opened</b> and <b>total card pulls</b> figures match osrs-tcg.net (cards = packs &times; 5). The per-card table comes from circulation tracking, which stops counting cards once they are sold back for credits or otherwise removed - so its sum runs lower than the official headline. Pull rates are relative frequencies within the tracked cards, so they are unaffected.</p>
+    <p>The headline <b>packs opened</b> and <b>total card pulls</b> figures match osrs-tcg.net (cards = packs &times; 5). The per-card table comes from circulation tracking, which stops counting cards once they are sold back for credits or otherwise removed - so its sum runs lower than the official headline. Pull rates are relative frequencies within the tracked cards, so they are unaffected. <b>Foil pulls</b> and the <b>in-circulation</b> figures are likewise tracked-cards-only: no public all-time foil counter exists (checked the API surface), so at the observed ~1% foil rate the true all-time foil total is likely around 1% of the official headline.</p>
     <p>Average foil rate across all recorded pulls: <b id="foil-rate">&hellip;</b> (assumed ~1% - official foil odds aren't published, so this observed frequency is our best estimate).</p>
     <p><b>Exist</b> = copies currently in circulation (supply). <b>Pulled &minus; exist</b> compares interest vs supply: positive means the card has been pulled more often than copies currently exist (relatively scarce); negative means more copies exist than pulls, presumably due to beta collection imports.</p>
     <h3>How this site is hosted</h3>
@@ -410,7 +410,8 @@ document.getElementById('stats').innerHTML = `
   <div class="stat chamfer-sm"><b>${D.cards.length.toLocaleString()}</b><span>cards</span></div>
   <div class="stat chamfer-sm"><b>${(D.officialPulled ?? D.totalPulled).toLocaleString()}</b><span>total card pulls</span></div>
   <div class="stat chamfer-sm"><b>${D.cards.reduce((s,c)=>s+c.pulledFoil,0).toLocaleString()}</b><span>foil pulls</span></div>` +
-  (D.packsOpened != null ? `<div class="stat chamfer-sm"><b>${D.packsOpened.toLocaleString()}</b><span>packs opened</span></div>` : '');
+  (D.packsOpened != null ? `<div class="stat chamfer-sm"><b>${D.packsOpened.toLocaleString()}</b><span>packs opened</span></div>` : '') +
+  (D.totalExistCards != null ? `<div class="stat chamfer-sm"><b>${D.totalExistCards.toLocaleString()} / ${D.totalExistFoils.toLocaleString()}</b><span>cards / foils in circulation</span></div>` : '');
 
 // Official tier palette, decoded from the osrs-tcg.net client bundle.
 const TIER_ORDER = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic', 'Godly'];

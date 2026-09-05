@@ -192,6 +192,11 @@ const extraRows = [...circMerged.keys()]
 
 const allRows = [...rows, ...extraRows].sort((a, b) => b.pullRatePct - a.pullRatePct);
 
+// Copies currently in circulation (supply), over ALL rows including the
+// unknown-kind extras the frontend filters out of the table.
+const totalExistCards = allRows.reduce((s, r) => s + (r.existNormal ?? 0) + (r.existFoil ?? 0), 0);
+const totalExistFoils = allRows.reduce((s, r) => s + (r.existFoil ?? 0), 0);
+
 // ---- SQLite ----
 const dbPath = path.join(HERE, "pull-rates.db");
 const db = new DatabaseSync(dbPath);
@@ -253,6 +258,8 @@ const generatedAt = runHour.toISOString();
 meta.run("generatedAt", generatedAt);
 meta.run("totalPulled", String(totalPulled));
 meta.run("packsOpened", packsOpened == null ? "" : String(packsOpened));
+meta.run("totalExistCards", String(totalExistCards));
+meta.run("totalExistFoils", String(totalExistFoils));
 meta.run("catalogVersion", circulation.partial === undefined ? "" : "");
 db.exec("DELETE FROM meta WHERE value = ''");
 db.close();
@@ -263,6 +270,8 @@ const frontendData = {
   totalPulled,
   packsOpened,
   officialPulled,
+  totalExistCards,
+  totalExistFoils,
   tagGroups: TAG_GROUPS,
   cards: allRows.map((r) => ({
     name: r.name,
