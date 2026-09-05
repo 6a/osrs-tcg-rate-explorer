@@ -128,8 +128,8 @@ fullArtBtn.addEventListener('click', () => {
   syncFullArtToggle();
   render();
 });
-syncFullArtToggle();
 loadFilters();
+syncFullArtToggle();
 const msEls = {};
 for (const def of MS_DEFS) {
   const root = document.getElementById('ms-' + def.id);
