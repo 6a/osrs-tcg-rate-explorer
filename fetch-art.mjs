@@ -2,12 +2,14 @@
 // site can serve images same-origin (osrs-tcg.net sets Cross-Origin-Resource-
 // Policy: same-site, which blocks hotlinking from other sites).
 //
-// Incremental: files already present in art/ are skipped, so hourly runs only
-// download new art.
+// Incremental: files already present and fresh (< 7 days old) are skipped,
+// so hourly runs only download new art. Files older than that are re-fetched
+// with a cache-busting query (upstream replaces art in place and Cloudflare
+// caches it, so replacements would otherwise never be picked up).
 //
 // Usage: node fetch-art.mjs
 
-import { readFile, writeFile, access, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,6 +20,9 @@ const BASE = "https://osrs-tcg.net";
 const RETRIES = 4;
 const BASE_DELAY_MS = 3000;
 const CONCURRENCY = 10;
+// Files older than this are re-fetched (upstream art replacements +
+// Cloudflare edge staleness otherwise stick forever).
+const REVALIDATE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
 
 const HEADERS = {
   "User-Agent":
@@ -27,16 +32,20 @@ const HEADERS = {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function exists(p) {
-  try { await access(p); return true; } catch { return false; }
-}
-
 async function downloadFile(imagePath) {
   const rel = imagePath.replace(/^\/images\/?/, "/");
   const dest = path.join(ART_DIR, rel);
-  if (await exists(dest)) return "skipped";
+  let hadFile = false;
+  try {
+    const st = await stat(dest);
+    hadFile = true;
+    if (Date.now() - st.mtimeMs < REVALIDATE_AFTER_MS) return "skipped";
+  } catch { /* missing: download below */ }
 
-  const url = BASE + imagePath;
+  // Cache-busting query forces Cloudflare to serve the origin copy, so a
+  // stale edge cache can't bake old bytes into our mirror (same trick as
+  // fetch-data.mjs). Saved to dest without the query string.
+  const url = `${BASE}${imagePath}?cb=${Date.now()}`;
   let lastErr;
   for (let attempt = 1; attempt <= RETRIES; attempt++) {
     try {
@@ -52,7 +61,7 @@ async function downloadFile(imagePath) {
       const buf = Buffer.from(await res.arrayBuffer());
       await mkdir(path.dirname(dest), { recursive: true });
       await writeFile(dest, buf);
-      return "downloaded";
+      return hadFile ? "refreshed" : "downloaded";
     } catch (err) {
       lastErr = err;
       const retryable =
@@ -74,7 +83,7 @@ const imagePaths = [
   ].filter(Boolean)),
 ];
 
-let downloaded = 0, skipped = 0;
+let downloaded = 0, refreshed = 0, skipped = 0;
 const failures = [];
 let next = 0;
 
@@ -83,7 +92,9 @@ async function worker() {
     const imagePath = imagePaths[next++];
     try {
       const result = await downloadFile(imagePath);
-      if (result === "downloaded") downloaded++; else skipped++;
+      if (result === "downloaded") downloaded++;
+      else if (result === "refreshed") refreshed++;
+      else skipped++;
     } catch (err) {
       failures.push(`${imagePath}: ${err.message}`);
     }
@@ -98,7 +109,7 @@ await writeFile(
 );
 
 console.log(
-  `art: ${downloaded} downloaded, ${skipped} already present, ${failures.length} failed` +
+  `art: ${downloaded} downloaded, ${refreshed} refreshed, ${skipped} already present, ${failures.length} failed` +
     (failures.length ? `\n${failures.slice(0, 10).join("\n")}` : ""),
 );
 if (failures.length) process.exit(2);
