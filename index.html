@@ -325,7 +325,7 @@
           <th class="num" data-k="oneInX">1 in X</th>
           <th class="num" data-k="existNormal" title="Copies currently in circulation (supply). 'Pulled' counts pack pulls ever (interest). Supply can exceed pulls, presumably due to beta collection imports.">Exist (normal)</th>
           <th class="num" data-k="existFoil" title="Copies currently in circulation (supply). 'Pulled' counts pack pulls ever (interest). Supply can exceed pulls, presumably due to beta collection imports.">Exist (foil)</th>
-          <th class="num" data-k="scarcity" title="Pulled minus exist (normal+foil). Positive: pulled often but few copies currently exist (relatively scarce). Negative: more copies exist than have been pulled from packs, presumably due to beta collection imports.">Pulled − exist</th>
+          <th class="num" data-k="scarcity" title="Pulled minus exist (normal+foil). Positive: pulled often but few copies currently exist (relatively scarce). Negative: more copies exist than have been pulled from packs, presumably due to beta collection imports.">Pulled - exist</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -346,13 +346,13 @@
     <p>Hover a card's art for about a second to see a larger preview.</p>
     <h3>Where the data comes from</h3>
     <p>All stats are based on <b>publicly available data</b> from the osrs-tcg.net public API (card catalog + circulation figures). Only <b>overall values</b> per card are published - pulls and copies-in-existence are not broken down per collection, so this site cannot show per-collection stats. Collections are listed per card, but the stats themselves are global.</p>
-    <h3>How accurate are the numbers?</h3>
-    <p>The stats are a reflection of the <b>publicly available live data</b>, which may differ from the actual server-side values (the API can serve cached snapshots, and we only see what it exposes). All we have is that public reflection. That said, by the <b>law of large numbers</b> the relative stats - pull rate %, 1-in-X - should become more accurate over time as the total number of recorded pulls grows.</p>
+    <h3>Where the headline numbers come from</h3>
+    <p><b>Packs opened</b> is the official pack counter, and <b>total card pulls</b> is packs &times; 5. That is exactly how osrs-tcg.net computes its own "Cards pulled" figure (verified in their site code), and every pack holds 5 cards, so our headline matches theirs by construction. The underlying snapshots refresh minutes apart and this site rebuilds hourly, so expect sub-1% wobble between the figures. Beta cards sit outside all of these numbers: the official docs say player stats omit beta cards, and imported beta cards don't count toward collection statistics.</p>
+    <p>One honest footnote: on the morning of Sep 5 (UTC) the official per-card totals jumped ~30% in a bulk backfill (a uniform ~1.3&times; across nearly all cards). Snapshots from before that window - including older screenshots of this site - read much lower.</p>
     <h3>How the odds are calculated</h3>
     <p><b>Pull rate %</b> = this card's total pulls (normal + foil) &divide; all card pulls, as a percentage. <b>1 in X</b> = total pulls across all cards &divide; this card's pulls - i.e. on average, roughly 1 in X pulls yields this card. These are observed frequencies from the public data, not official pack odds (which aren't published).</p>
-    <p>The headline <b>packs opened</b> and <b>total card pulls</b> figures match osrs-tcg.net (cards = packs &times; 5). The per-card table comes from circulation tracking, which stops counting cards once they are sold back for credits or otherwise removed - so its sum runs lower than the official headline. Pull rates are relative frequencies within the tracked cards, so they are unaffected. <b>Foil pulls</b> and the <b>in-circulation</b> figures are likewise tracked-cards-only: no public all-time foil counter exists (checked the API surface), so at the observed ~1% foil rate the true all-time foil total is likely around 1% of the official headline.</p>
-    <p>Average foil rate across tracked pulls: <b id="foil-rate">&hellip;</b> (official foil odds aren't published - this is measured on tracked cards only, and the true all-time rate is likely a little lower since cards sold back skew toward normals).</p>
-    <p><b>Exist</b> = copies currently in circulation (supply). <b>Pulled &minus; exist</b> compares interest vs supply: positive means the card has been pulled more often than copies currently exist (relatively scarce); negative means more copies exist than pulls, presumably due to beta collection imports.</p>
+    <p>Each pack holds <b>5 cards</b> and a foil takes one of the five slots. The average foil rate is <b id="foil-rate">&hellip;</b> of tracked pulls, bounded by <b id="foil-bounds">&hellip;</b> depending on how many removed cards were foils (almost none were) - computed live from the data on every load, never a fixed constant. The community long assumed 1%, and the measurement confirms it. No official foil odds are published and the public data could be incomplete, so treat this as the best available estimate rather than gospel.</p>
+    <p><b>Exist</b> = copies currently owned (supply). <b>Pulled &minus; exist</b> = tracked pulls no longer owned: currently <b id="unowned">&hellip;</b>, almost all of them normals - sold back, consumed, or otherwise removed (foils are hoarded: only a few hundred tracked foils are missing). A negative value means more owned than pulled: a handful of cards were granted outside packs or remapped between IDs (e.g. Hoop snake and Crawling Hand show near-zero pulls with thousands owned).</p>
     <h3>How this site is hosted</h3>
     <p>An automated hourly job on a home server fetches the public API, rebuilds the dataset, and publishes everything as a static site to GitHub Pages. Nothing runs server-side when you browse, and no data about you is collected.</p>
     <h3>A note on accuracy</h3>
@@ -403,13 +403,22 @@ function fmtGenerated() {
 document.getElementById('sub').innerHTML =
   'Generated ' + fmtGenerated() +
   ' &middot; this site updates once per hour, on the hour';
-document.getElementById('foil-rate').textContent =
-  (D.cards.reduce((s, c) => s + c.pulledFoil, 0) / D.totalPulled * 100).toFixed(2) + '%';
+const foilSum = D.cards.reduce((s, c) => s + c.pulledFoil, 0);
+const trackedFoilRate = D.totalPulled ? foilSum / D.totalPulled : 0;
+document.getElementById('foil-rate').textContent = (trackedFoilRate * 100).toFixed(2) + '%';
+// All-time foil bounds, computed live (never hardcoded): the low end assumes
+// no removed card was ever a foil, the high end assumes removed cards match
+// the tracked rate. Stale data without the official figure degrades to tracked.
+const foilLowRate = D.officialPulled ? foilSum / D.officialPulled : trackedFoilRate;
+document.getElementById('foil-bounds').textContent =
+  `${(foilLowRate * 100).toFixed(3)}% - ${(trackedFoilRate * 100).toFixed(3)}%`;
+document.getElementById('unowned').textContent =
+  D.totalExistCards != null ? (D.totalPulled - D.totalExistCards).toLocaleString() : 'unknown';
 
 document.getElementById('stats').innerHTML = `
   <div class="stat chamfer-sm"><b>${D.cards.length.toLocaleString()}</b><span>cards</span></div>
   <div class="stat chamfer-sm"><b>${(D.officialPulled ?? D.totalPulled).toLocaleString()}</b><span>total card pulls</span></div>
-  <div class="stat chamfer-sm"><b>${D.cards.reduce((s,c)=>s+c.pulledFoil,0).toLocaleString()}</b><span>foil pulls</span></div>` +
+  <div class="stat chamfer-sm"><b>${foilSum.toLocaleString()}</b><span>foil pulls</span></div>` +
   (D.packsOpened != null ? `<div class="stat chamfer-sm"><b>${D.packsOpened.toLocaleString()}</b><span>packs opened</span></div>` : '') +
   (D.totalExistCards != null ? `<div class="stat chamfer-sm"><b>${D.totalExistCards.toLocaleString()} / ${D.totalExistFoils.toLocaleString()}</b><span>cards / foils in circulation</span></div>` : '');
 
@@ -586,7 +595,7 @@ const COL_DEFS = [
   { k: 'oneInX', header: '1 in X' },
   { k: 'existNormal', header: 'Exist (normal)' },
   { k: 'existFoil', header: 'Exist (foil)' },
-  { k: 'scarcity', header: 'Pulled − exist' },
+  { k: 'scarcity', header: 'Pulled - exist' },
 ];
 function lockColumnWidths() {
   const maxes = COL_DEFS.map(() => 0);
