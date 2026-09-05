@@ -239,14 +239,23 @@ const kinds = [
 ];
 const collsSeen = new Set(allRows.flatMap((r) => r.collections));
 // New regions come from entity region data, which upstream keeps messy
-// ("A", "N", "link=..." junk rows exist), so unseen values must look like a
-// real place name to earn a filter option. Canonical names are always kept.
+// ("A", "N", "No", "link=..." junk rows exist), so an unseen value must look
+// like a real place name AND be shared by 25+ cards to earn a filter option.
+// That admits genuine buckets ("General", "All regions") while keeping
+// one-card typos ("Transmute") out; entries vanish on their own if upstream
+// cleans the data.
 const regionsSeen = new Set();
-for (const e of entities) for (const rg of (e.regions ?? [])) regionsSeen.add(rg);
+const regionCards = {};
+for (const e of entities) {
+  for (const rg of new Set(e.regions ?? [])) {
+    regionsSeen.add(rg);
+    regionCards[rg] = (regionCards[rg] ?? 0) + 1;
+  }
+}
 const REGION_OK = /^[A-Za-z][A-Za-z ]{2,}$/;
 const collections = [
   ...CANON_COLLS.filter((c) => collsSeen.has(c)),
-  ...[...regionsSeen].filter((c) => !CANON_COLLS.includes(c) && REGION_OK.test(c)).sort(),
+  ...[...regionsSeen].filter((c) => !CANON_COLLS.includes(c) && REGION_OK.test(c) && (regionCards[c] ?? 0) >= 25).sort(),
 ];
 
 // ---- SQLite ----
