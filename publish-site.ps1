@@ -28,6 +28,10 @@ try {
 
   Push-Location C:\tcg-site
   git add index.html styles.css app.js data.js .github art
+  # Regular commits (NOT --amend): amending pins every tip to the same ancient
+  # parent, so GitHub renders each hourly diff as the whole tree. A normal
+  # commit parents onto last hour, making diffs tiny and truthful. Blobs are
+  # content-hashed either way, so this changes readability, not storage.
   # Fail-closed full-art mirror guard: .gitignore contains art/, and `git add`
   # on an ignored path adds nothing yet exits 0 - then amend+push succeed
   # shipping data.js paths with zero bytes. Count "fullArt":1 rows in the
@@ -45,7 +49,7 @@ try {
     git check-ignore -q $guard.first
     if ($LASTEXITCODE -ne 1) { throw "full-art guard: $($guard.first) is git-ignored; art/full mirror would not deploy" }
   }
-  git commit --amend -m "site data $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+  git commit -m "site data $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
   if (($LASTEXITCODE -ne 0) -and ($LASTEXITCODE -ne 1)) { throw "commit failed ($LASTEXITCODE)" }
   git push -f origin site
   if ($LASTEXITCODE -ne 0) { throw "push failed ($LASTEXITCODE)" }
