@@ -3,7 +3,9 @@
 //   - data.js        (embedded data for the local frontend)
 //
 // Pull rate methodology:
-//   totalPulled   = sum over all cards of (pulledNormal + pulledFoil)
+//   totalPulled   = sum over all VISIBLE cards of (pulledNormal + pulledFoil)
+//                   (hidden unknown-kind circulation is excluded, so headline,
+//                   table sums, and per-card rates share one denominator)
 //   card pull rate = (pulledNormal + pulledFoil) / totalPulled * 100
 //
 // Usage: node build.mjs
@@ -41,10 +43,7 @@ for (const [key, stats] of Object.entries(circ)) {
   }
 }
 
-const totalPulled = [...circMerged.values()].reduce(
-  (sum, c) => sum + (c.pulledNormal ?? 0) + (c.pulledFoil ?? 0),
-  0,
-);
+
 
 // Official headline totals: packs opened comes from packs/stats, and the
 // official site reports cards pulled as packs x 5 (every pack yields 5 cards).
@@ -176,6 +175,13 @@ const consumedNpcKeys = new Set(
     .filter(([name]) => splitCards.has(name))
     .map(([, id]) => `npc:${id}`),
 );
+const knownNames = new Set(entities.map((e) => e.name.toLowerCase()));
+// Denominator for pull rates (and the headline total): visible rows only.
+// Unknown-kind circulation (no catalog entry, never rendered) is excluded so
+// headline, table sums, and per-card rates share one denominator.
+const totalPulled = [...circMerged.entries()]
+  .filter(([k]) => knownNames.has(k) || consumedNpcKeys.has(k))
+  .reduce((sum, [, c]) => sum + (c.pulledNormal ?? 0) + (c.pulledFoil ?? 0), 0);
 
 // Collapse to one row per lowercase name, except for split-tracked cards.
 const byKey = new Map();
@@ -251,7 +257,7 @@ const rows = [...byKey.entries()].map(([k, e]) => {
 
 // Circulation entries with no catalog entry (e.g. special variants); skip the
 // npc:{id} keys that were resolved onto NPC rows above.
-const knownNames = new Set(entities.map((e) => e.name.toLowerCase()));
+// (knownNames is defined up with totalPulled and reused here.)
 const extraRows = [...circMerged.keys()]
   .filter((k) => !knownNames.has(k) && !consumedNpcKeys.has(k))
   .map((k) => {
