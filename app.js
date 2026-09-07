@@ -82,6 +82,9 @@ function escapeAttr(s) { return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
 // shared triangle icon (filter carets + sort indicators), ascending = flipped
 const TRI = '<svg class="tri" viewBox="0 0 10 7" width="10" height="7" aria-hidden="true"><path d="M0 0H10L5 7Z" fill="currentColor"/></svg>';
 const TRI_UP = '<svg class="tri up" viewBox="0 0 10 7" width="10" height="7" aria-hidden="true"><path d="M0 0H10L5 7Z" fill="currentColor"/></svg>';
+// circled-i info mark (inline SVG, not the 🛈 glyph: font rendering varies,
+// especially bolded) - currentColor so .has-full recolors it gold
+const INFO = '<svg class="info-ic" viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><circle cx="8" cy="8" r="6.75" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="4.6" r="1.15" fill="currentColor"/><rect x="7.2" y="7.2" width="1.6" height="4.6" fill="currentColor"/></svg>';
 function wikiUrl(c) {
   const base = 'https://oldschool.runescape.wiki/w/';
   return c.wiki ? base + encodeURIComponent(c.wiki.replace(/ /g, '_')) : null;
@@ -272,7 +275,7 @@ const COL_DEFS = [
 function lockColumnWidths() {
   const maxes = COL_DEFS.map(() => 0);
   for (const c of D.cards) {
-    const nameW = textW(c.name, .84, 600) + textW('🛈', .8, 400) + rootPx * .4;
+    const nameW = textW(c.name, .84, 600) + 13 + rootPx * .4; // 13px info mark + margin
     if (nameW > maxes[0]) maxes[0] = nameW;
     const chipW = textW(c.rarity || '?', .84, 400);
     if (chipW > maxes[1]) maxes[1] = chipW;
@@ -350,13 +353,13 @@ function applyFilter() {
 function rowHtml(c) {
   const w = wikiUrl(c);
   const tnameCls = c.rarity && TIER_ORDER.includes(c.rarity) ? ` tname-${c.rarity}` : '';
-  // One info glyph per row carries kind + packs + full art into the popup;
+  // One info mark per row carries kind + packs + full art into the popup;
   // gold marks cards with a pulled full art.
   const hasFull = c.fullArt && c.fullArtPath;
   const info = `<span class="info${hasFull ? ' has-full' : ''}"` +
     ` data-kind="${escapeAttr(KIND_TAG[c.kind] || '')}"` +
     ` data-packs="${escapeAttr((c.packs || []).join(','))}"` +
-    (hasFull ? ` data-fullsrc="${escapeAttr(c.fullArtPath)}"` : '') + `>🛈</span>`;
+    (hasFull ? ` data-fullsrc="${escapeAttr(c.fullArtPath)}"` : '') + `>${INFO}</span>`;
   const nameHtml = (w ? `<a class="tname${tnameCls}" href="${w}" target="_blank">${c.name}</a>`
                       : `<span class="tname${tnameCls}">${c.name}</span>`) + ' ' + info;
   const src = artSrc(c);
@@ -499,7 +502,7 @@ tbody.addEventListener('mouseout', (e) => {
 });
 document.querySelector('.tablewrap').addEventListener('scroll', () => { hidePreview(); hideInfo(); }, { passive: true });
 
-// ---- card info popup (type + packs + optional full art, via the 🛈 glyph) ----
+// ---- card info popup (type + packs + optional full art, via the info mark) ----
 const infopop = document.getElementById('infopop');
 let infoTimer = null;
 function hideInfo() {

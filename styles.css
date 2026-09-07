@@ -249,8 +249,9 @@
   .tname-Mythic { color: #FF6EC7; }
   .tname-Godly { color: #F2C94C; }
   .rarity { display: inline-block; padding: .15rem .6rem; font-size: .72rem; font-weight: 700; letter-spacing: .03em; color: #fff; }
-  .info { color: var(--rl-muted); cursor: help; margin-left: .4rem; font-size: .8rem; }
+  .info { color: var(--rl-muted); cursor: help; margin-left: .4rem; }
   .info.has-full { color: #F2C94C; }
+  .info .info-ic { display: block; }
   .rarity-chip { cursor: pointer; }
   /* chip text uses the official tier palette (same as the name column);
      Epic lightened from #5B2C6F for contrast, like the names */
