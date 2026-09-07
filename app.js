@@ -30,18 +30,25 @@ let sortKeys = (() => {
 function saveSort() { try { localStorage.setItem('tcgSort', JSON.stringify(sortKeys)); } catch {} }
 const defaultDir = (k) => (k === 'name' || k === 'rarity') ? 1 : -1;
 
-// viewer's local timezone when possible, UTC fallback
+// pinned to JST (schedule anchor), UTC fallback - never the viewer's zone,
+// so the timestamp and the "around 20:00 JST" suffix always agree
 function fmtGenerated() {
   const d = new Date(D.generatedAt);
   if (isNaN(d)) return 'unknown';
-  try { return d.toLocaleString(undefined, { timeZoneName: 'short' }); }
+  try { return d.toLocaleString(undefined, { timeZone: 'Asia/Tokyo', timeZoneName: 'short' }); }
   catch { return d.toISOString().replace('T', ' ').replace(/\.\d+Z$/, ' UTC'); }
 }
 document.getElementById('sub').innerHTML =
   'Generated ' + fmtGenerated() +
-  ' &middot; this site updates once per hour, on the hour';
+  ' &middot; this site updates once a day, around 20:00 JST';
+// Displayed aggregates recomputed over the visible rows: build-time totals
+// include hidden unknown-kind rows (currently 116k pulls / 1.2k foils), so
+// using them would desync every box from the table below.
+const shownPulled = D.cards.reduce((s, c) => s + c.pulled, 0);
+const shownExistCards = D.cards.reduce((s, c) => s + ((c.existNormal ?? 0) + (c.existFoil ?? 0)), 0);
+const shownExistFoils = D.cards.reduce((s, c) => s + (c.existFoil ?? 0), 0);
 const foilSum = D.cards.reduce((s, c) => s + c.pulledFoil, 0);
-const trackedFoilRate = D.totalPulled ? foilSum / D.totalPulled : 0;
+const trackedFoilRate = shownPulled ? foilSum / shownPulled : 0;
 document.getElementById('foil-rate').textContent = (trackedFoilRate * 100).toFixed(2) + '%';
 // All-time foil bounds, computed live (never hardcoded): the low end assumes
 // no removed card was ever a foil, the high end assumes removed cards match
@@ -50,16 +57,20 @@ const foilLowRate = D.officialPulled ? foilSum / D.officialPulled : trackedFoilR
 document.getElementById('foil-bounds').textContent =
   `${(foilLowRate * 100).toFixed(3)}% - ${(trackedFoilRate * 100).toFixed(3)}%`;
 document.getElementById('unowned').textContent =
-  D.totalExistCards != null ? (D.totalPulled - D.totalExistCards).toLocaleString() : 'unknown';
+  D.totalExistCards != null ? (shownPulled - shownExistCards).toLocaleString() : 'unknown';
 
 const fullArtCount = D.cards.reduce((s, c) => s + (c.fullArt ? 1 : 0), 0);
+// Headline is the VISIBLE per-card sum (unified with the table below),
+// deliberately NOT packs x 5 and NOT the build-time total (which includes
+// hidden unknown-kind rows): the official per-card feed lags its pack
+// counter, so the two disagree, and internal consistency wins. See FAQ.
 document.getElementById('stats').innerHTML = `
   <div class="stat chamfer-sm"><b>${D.cards.length.toLocaleString()}</b><span>cards</span></div>
-  <div class="stat chamfer-sm"><b>${(D.officialPulled ?? D.totalPulled).toLocaleString()}</b><span>total card pulls</span></div>
+  <div class="stat chamfer-sm"><b>${shownPulled.toLocaleString()}</b><span>total card pulls</span></div>
   <div class="stat chamfer-sm"><b>${foilSum.toLocaleString()}</b><span>foil pulls</span></div>` +
   (fullArtCount > 0 ? `<div class="stat chamfer-sm"><b>${fullArtCount.toLocaleString()}</b><span>unique full art cards</span></div>` : '') +
   (D.packsOpened != null ? `<div class="stat chamfer-sm"><b>${D.packsOpened.toLocaleString()}</b><span>packs opened</span></div>` : '') +
-  (D.totalExistCards != null ? `<div class="stat chamfer-sm"><b>${D.totalExistCards.toLocaleString()} / ${D.totalExistFoils.toLocaleString()}</b><span>cards / foils in circulation</span></div>` : '');
+  (D.totalExistCards != null ? `<div class="stat chamfer-sm"><b>${shownExistCards.toLocaleString()} / ${shownExistFoils.toLocaleString()}</b><span>cards / foils in circulation</span></div>` : '');
 
 // Official tier palette, decoded from the osrs-tcg.net client bundle.
 const FALLBACK_TIERS = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic', 'Godly'];
