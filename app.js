@@ -8,6 +8,8 @@ if (!D || !Array.isArray(D.cards)) {
   throw new Error('PULL_DATA missing or stale');
 }
 if (!Array.isArray(D.tagGroups)) D.tagGroups = [];
+// Pack thumbnail map for the Collections column (stale payloads predate it).
+const PACK_THUMBS = (D.packThumbs && typeof D.packThumbs === 'object') ? D.packThumbs : {};
 // "npc:{id}" rows that failed to resolve are parser failures - hide them.
 D.cards = D.cards.filter(c => c.kind !== 'unknown');
 // supply-vs-pulls scarcity: pulled minus currently-existing copies (normal+foil)
@@ -231,14 +233,6 @@ function lockFilterWidths() {
   }
 }
 
-// Cards whose item and NPC versions are tracked separately share a name;
-// tag each row so the two can be told apart.
-const splitNames = new Set();
-{
-  const counts = {};
-  D.cards.forEach(c => { if (c.kind === 'item' || c.kind === 'npc') counts[c.name.toLowerCase()] = (counts[c.name.toLowerCase()] || 0) + 1; });
-  Object.entries(counts).forEach(([n, k]) => { if (k > 1) splitNames.add(n); });
-}
 const KIND_TAG = Object.fromEntries(TYPE_VALUES.map(({ v, l }) => [v, l]));
 KIND_TAG['item+npc'] = 'Item+NPC'; // merged display kind, never a filter value
 
@@ -250,7 +244,11 @@ KIND_TAG['item+npc'] = 'Item+NPC'; // merged display kind, never a filter value
 const tableEl = document.getElementById('table');
 const CELL_PAD = 24; // .7rem x2 cell padding + border fudge
 const ARROW_W = 26;  // sort arrow + (up to 2-digit) precedence number
-const TAG_EXTRA = 24; // kindtag padding + border + margin-left
+// Tier cells hold bare text (the rarity "chip" is just a color class, no
+// padding), and the column is nearly always single-sorted, so the generic
+// 2-digit-precedence allowance is ~8px of air there. Tighten it; a 10+ key
+// multi-sort may cozy up to the header arrow, never the data.
+const TIER_ARROW_W = 18;
 const NAME_EXTRA = 43; // 34px icon slot + flex gap
 const measCtx = document.createElement('canvas').getContext('2d');
 const bodyFont = getComputedStyle(document.body).fontFamily;
@@ -274,8 +272,7 @@ const COL_DEFS = [
 function lockColumnWidths() {
   const maxes = COL_DEFS.map(() => 0);
   for (const c of D.cards) {
-    const tag = KIND_TAG[c.kind] && (c.kind !== 'item+npc' || splitNames.has(c.name.toLowerCase()));
-    const nameW = textW(c.name, .84, 600) + (tag ? textW(KIND_TAG[c.kind], .68, 600) + TAG_EXTRA : 0) + (c.fullArt ? textW('Has full art', .68, 600) + TAG_EXTRA : 0);
+    const nameW = textW(c.name, .84, 600) + textW('🛈', .8, 400) + rootPx * .4;
     if (nameW > maxes[0]) maxes[0] = nameW;
     const chipW = textW(c.rarity || '?', .84, 400);
     if (chipW > maxes[1]) maxes[1] = chipW;
@@ -296,7 +293,7 @@ function lockColumnWidths() {
   }
   const widths = COL_DEFS.map((d, i) =>
     Math.ceil(Math.max(maxes[i], textW(d.header, .8, 600)) +
-      (i === 0 ? NAME_EXTRA : 0) + CELL_PAD + ARROW_W));
+      (i === 0 ? NAME_EXTRA : 0) + CELL_PAD + (d.k === 'rarity' ? TIER_ARROW_W : ARROW_W)));
   let cg = tableEl.querySelector('colgroup');
   if (!cg) { cg = document.createElement('colgroup'); tableEl.insertBefore(cg, tableEl.firstElementChild); }
   cg.innerHTML = widths.map(w => `<col style="width:${w}px">`).join('');
@@ -352,13 +349,16 @@ function applyFilter() {
 
 function rowHtml(c) {
   const w = wikiUrl(c);
-  const tag = KIND_TAG[c.kind] && (c.kind !== 'item+npc' || splitNames.has(c.name.toLowerCase()))
-    ? ` <span class="kindtag">${KIND_TAG[c.kind]}</span>` : '';
   const tnameCls = c.rarity && TIER_ORDER.includes(c.rarity) ? ` tname-${c.rarity}` : '';
-  const fatag = (c.fullArt && c.fullArtPath)
-    ? ` <span class="fullarttag" data-fullsrc="${escapeAttr(c.fullArtPath)}">Has full art</span>` : '';
+  // One info glyph per row carries kind + packs + full art into the popup;
+  // gold marks cards with a pulled full art.
+  const hasFull = c.fullArt && c.fullArtPath;
+  const info = `<span class="info${hasFull ? ' has-full' : ''}"` +
+    ` data-kind="${escapeAttr(KIND_TAG[c.kind] || '')}"` +
+    ` data-packs="${escapeAttr((c.packs || []).join(','))}"` +
+    (hasFull ? ` data-fullsrc="${escapeAttr(c.fullArtPath)}"` : '') + `>🛈</span>`;
   const nameHtml = (w ? `<a class="tname${tnameCls}" href="${w}" target="_blank">${c.name}</a>`
-                      : `<span class="tname${tnameCls}">${c.name}</span>`) + tag + fatag;
+                      : `<span class="tname${tnameCls}">${c.name}</span>`) + ' ' + info;
   const src = artSrc(c);
   const art = src
     ? `<span class="icon-slot" data-src="${escapeAttr(src)}"><img src="${escapeAttr(src)}" loading="lazy" decoding="async" fetchpriority="low" alt="" onerror="this.parentElement.classList.add('empty')"></span>`
@@ -468,39 +468,68 @@ function hidePreview() {
   previewSeq++;
   clearTimeout(previewTimer);
   preview.style.display = 'none';
-  preview.classList.remove('is-fullart');
+}
+function placePopup(el) {
+  const r = el.getBoundingClientRect();
+  let x = mouseX + 18, y = mouseY + 12;
+  if (x + r.width > innerWidth - 8) x = mouseX - r.width - 18;
+  if (y + r.height > innerHeight - 8) y = Math.max(8, innerHeight - r.height - 8);
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
 }
 tbody.addEventListener('mouseover', (e) => {
-  const trig = e.target.closest('.icon-slot,.fullarttag');
-  if (!trig) return;
-  const src = trig.dataset.src || trig.dataset.fullsrc;
-  if (!src) return;
+  const slot = e.target.closest('.icon-slot');
+  if (!slot || !slot.dataset.src) return;
   clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
     const seq = ++previewSeq;
-    // full-art popup width is clamped to the card-art width (see styles.css)
-    preview.classList.toggle('is-fullart', !trig.dataset.src);
     // position only once the image has its natural size, so the popup
-    // fits the art (card or full art) instead of a fixed box
+    // fits the art instead of a fixed box
     previewImg.onload = () => {
       if (seq !== previewSeq) return;
       preview.style.display = 'block';
-      const r = preview.getBoundingClientRect();
-      let x = mouseX + 18, y = mouseY + 12;
-      if (x + r.width > innerWidth - 8) x = mouseX - r.width - 18;
-      if (y + r.height > innerHeight - 8) y = Math.max(8, innerHeight - r.height - 8);
-      preview.style.left = x + 'px';
-      preview.style.top = y + 'px';
+      placePopup(preview);
     };
-    previewImg.src = src;
+    previewImg.src = slot.dataset.src;
   }, 500);
 });
 tbody.addEventListener('mouseout', (e) => {
-  if (!e.target.closest('.icon-slot,.fullarttag')) return;
-  if (e.relatedTarget?.closest?.('.icon-slot,.fullarttag')) return;
+  if (!e.target.closest('.icon-slot')) return;
   hidePreview();
 });
-document.querySelector('.tablewrap').addEventListener('scroll', hidePreview, { passive: true });
+document.querySelector('.tablewrap').addEventListener('scroll', () => { hidePreview(); hideInfo(); }, { passive: true });
+
+// ---- card info popup (type + packs + optional full art, via the 🛈 glyph) ----
+const infopop = document.getElementById('infopop');
+let infoTimer = null;
+function hideInfo() {
+  clearTimeout(infoTimer);
+  infopop.style.display = 'none';
+}
+tbody.addEventListener('mouseover', (e) => {
+  const trig = e.target.closest('.info');
+  if (!trig) return;
+  clearTimeout(infoTimer);
+  infoTimer = setTimeout(() => {
+    const packs = (trig.dataset.packs || '').split(',').filter((p) => PACK_THUMBS[p]);
+    const icons = packs.map((p) =>
+      `<img src="${escapeAttr(PACK_THUMBS[p])}" title="${escapeAttr(p)}" alt="${escapeAttr(p)}" loading="lazy" onerror="this.remove()">`).join('');
+    infopop.innerHTML =
+      `<div class="inforow"><span>Type</span><b>${escapeAttr(trig.dataset.kind || '?')}</b></div>` +
+      `<div class="inforow"><span>Packs</span>${icons ? `<span class="packicons">${icons}</span>` : '?'}</div>` +
+      (trig.dataset.fullsrc
+        ? `<img class="fullimg" src="${escapeAttr(trig.dataset.fullsrc)}" alt="Full art" loading="lazy" onerror="this.remove()">`
+        : '');
+    infopop.style.display = 'block';
+    placePopup(infopop);
+    const fi = infopop.querySelector('.fullimg');
+    if (fi) fi.onload = () => placePopup(infopop);
+  }, 500);
+});
+tbody.addEventListener('mouseout', (e) => {
+  if (!e.target.closest('.info')) return;
+  hideInfo();
+});
 
 // ---- FAQ modal ----
 const faqEl = document.getElementById('faq');
