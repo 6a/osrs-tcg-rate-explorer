@@ -9,7 +9,7 @@
 //
 // Usage: node fetch-art.mjs
 
-import { readFile, writeFile, mkdir, rm, stat } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -218,6 +218,93 @@ async function fullWorker() {
 
 await Promise.all(Array.from({ length: CONCURRENCY }, fullWorker));
 
+// ---- pack thumbnails (Collections column icons) ----
+// Same collection->thumbnail pick as build.mjs (prefer the base pack over
+// its x10 twin; mapping duplicated - separate processes, build.mjs executes
+// on import so one cannot import the other).
+const packThumbByName = new Map(); // collectionName -> { remote, local }
+const packThumbOrder = [];
+try {
+  const defs = JSON.parse(await readFile(path.join(HERE, "raw_packs_catalog.json"), "utf8"));
+  for (const p of defs.packs ?? []) {
+    if (!p.collectionName || !p.thumbnail) continue;
+    const prev = packThumbByName.get(p.collectionName);
+    if (prev && p.id.endsWith("_large")) continue;
+    // base pack supersedes an x10 seen first; order stays at first sight
+    packThumbByName.set(p.collectionName, { remote: p.thumbnail, local: "art/" + p.thumbnail.replace(/^\/images\/?/, "") });
+    if (!prev) packThumbOrder.push(p.collectionName);
+  }
+  // Fallback Standard pack for collection-less cards (mirrors build.mjs).
+  for (const p of defs.packs ?? []) {
+    if (p.collectionName || !p.thumbnail || !p.name || p.id.endsWith("_large")) continue;
+    if (!packThumbByName.has(p.name)) {
+      packThumbByName.set(p.name, { remote: p.thumbnail, local: "art/" + p.thumbnail.replace(/^\/images\/?/, "") });
+      packThumbOrder.unshift(p.name);
+    }
+    break;
+  }
+} catch { /* defs missing: build renders empty cells, nothing to fetch */ }
+const packThumbPaths = packThumbOrder.map((name) => ({ name, ...packThumbByName.get(name) }));
+
+async function downloadPackThumb(t) {
+  const dest = path.join(HERE, t.local);
+  try {
+    const st = await stat(dest);
+    if (Date.now() - st.mtimeMs < REVALIDATE_AFTER_MS) return "skipped";
+  } catch { /* missing: download below */ }
+  const url = `${BASE}${t.remote}?cb=${Date.now()}`;
+  let lastErr;
+  for (let attempt = 1; attempt <= RETRIES; attempt++) {
+    try {
+      const res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(30000) });
+      if (!res.ok) {
+        const err = new Error(`${url} -> HTTP ${res.status}`);
+        err.retryable = res.status === 403 || res.status === 429 || res.status >= 500;
+        throw err;
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      await mkdir(path.dirname(dest), { recursive: true });
+      await writeFile(dest, buf);
+      return "downloaded";
+    } catch (err) {
+      lastErr = err;
+      const retryable =
+        err.retryable || err.name === "TimeoutError" || err.name === "AbortError" ||
+        err.cause?.code === "ECONNRESET" || err.cause?.code === "ETIMEDOUT";
+      if (!retryable || attempt === RETRIES) throw err;
+      await sleep(BASE_DELAY_MS * 2 ** (attempt - 1));
+    }
+  }
+  throw lastErr;
+}
+
+let packDownloaded = 0, packSkipped = 0;
+const packFailures = [];
+let packNext = 0;
+async function packWorker() {
+  while (packNext < packThumbPaths.length) {
+    const t = packThumbPaths[packNext++];
+    try {
+      const r = await downloadPackThumb(t);
+      if (r === "downloaded") packDownloaded++;
+      else packSkipped++;
+    } catch (err) {
+      packFailures.push(`${t.local}: ${err.message}`);
+    }
+  }
+}
+await Promise.all(Array.from({ length: CONCURRENCY }, packWorker));
+
+// Prune hash-rotated orphans: thumbnail filenames carry a version hash, so a
+// replaced artwork lands as a NEW file - drop mirror files no longer referenced.
+try {
+  const dir = path.join(ART_DIR, "packs");
+  const keep = new Set(packThumbPaths.map((t) => t.local.split("/").pop()));
+  for (const f of await readdir(dir)) {
+    if (!keep.has(f)) await rm(path.join(dir, f), { force: true });
+  }
+} catch { /* dir missing: nothing to prune */ }
+
 await writeFile(
   path.join(HERE, "art-manifest.json"),
   JSON.stringify(
@@ -225,6 +312,7 @@ await writeFile(
       generatedAt: new Date().toISOString(),
       imagePaths,
       fullArtPaths: [...fullArtActual].sort(),
+      packThumbs: packThumbPaths.map((t) => t.local).sort(),
     },
     null,
     2,
@@ -239,7 +327,14 @@ console.log(
   `full-art: ${fullDownloaded} downloaded, ${fullRefreshed} refreshed, ${fullSkipped} already present, ${fullFailures.length} failed of ${fullArtEntries.length} expected` +
     (fullFailures.length ? `\n${fullFailures.slice(0, 10).join("\n")}` : ""),
 );
+console.log(
+  `pack-thumbs: ${packDownloaded} downloaded, ${packSkipped} already present, ${packFailures.length} failed of ${packThumbPaths.length} expected` +
+    (packFailures.length ? `\n${packFailures.slice(0, 10).join("\n")}` : ""),
+);
 if (failures.length) process.exit(2);
+// Pack thumbnails are tiny core column assets (14 files): any failure aborts
+// the publish like base art, so the column never ships broken icons.
+if (packFailures.length) process.exit(2);
 // Full-art failures only log and continue - EXCEPT the run exits 2 when the
 // failure rate exceeds 20% of expected (covers total outages: token rotation,
 // CORP change, endpoint death). expected === 0 never exits.

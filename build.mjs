@@ -59,6 +59,52 @@ try {
 } catch {}
 const officialPulled = packsOpened != null ? packsOpened * CARDS_PER_PACK : null;
 
+// Pack/collection definitions (GET /api/v1/packs): collectionName -> local
+// thumbnail path, in shop order. One icon per collection, preferring the
+// base pack over its x10 twin. Missing file -> no collections anywhere
+// (frontend renders empty cells, never throws).
+let packThumbs = {};
+let packOrder = [];
+let packDefs = { packs: [] };
+try {
+  packDefs = JSON.parse(await readFile(path.join(HERE, "raw_packs_catalog.json"), "utf8"));
+  for (const p of packDefs.packs ?? []) {
+    if (!p.collectionName || !p.thumbnail) continue;
+    // local mirror path follows the card-art convention ('art' + path with
+    // the /images prefix stripped, e.g. art/packs/Pack_x.png)
+    const local = "art/" + p.thumbnail.replace(/^\/images\/?/, "");
+    if (packThumbs[p.collectionName] && p.id.endsWith("_large")) continue;
+    if (packThumbs[p.collectionName] && !p.id.endsWith("_large")) {
+      // base pack supersedes an x10 seen first; order stays at first sight
+      packThumbs[p.collectionName] = local;
+      continue;
+    }
+    packThumbs[p.collectionName] = local;
+    packOrder.push(p.collectionName);
+  }
+} catch {}
+const packRank = Object.fromEntries(packOrder.map((c, i) => [c, i]));
+// Fallback for cards in no collection: the base Standard pack (first
+// collection-less non-large pack in the shop defs). Keyed by its display
+// name; listed first to match shop order.
+let standardPackName = null;
+for (const p of packDefs.packs ?? []) {
+  if (p.collectionName || !p.thumbnail || !p.name || p.id.endsWith("_large")) continue;
+  standardPackName = p.name;
+  packThumbs[p.name] = "art/" + p.thumbnail.replace(/^\/images\/?/, "");
+  packOrder.unshift(p.name);
+  break;
+}
+for (const [i, c] of packOrder.entries()) packRank[c] = i;
+function packsFor(collections) {
+  const mine = [...new Set((collections ?? []).filter((c) => packRank[c] != null))]
+    .sort((a, b) => packRank[a] - packRank[b]);
+  // Every card is available in Standard packs: always lead with it
+  // (rank 0, matching shop order), not just as a packless fallback.
+  if (standardPackName && !mine.includes(standardPackName)) mine.unshift(standardPackName);
+  return mine;
+}
+
 // Official osrs-tcg.net tag filter groups (mirrors their tag dropdown).
 // Generated here at gather time: each card gets its normalized official
 // labels, and the group structure is embedded in data.js for the frontend.
@@ -167,6 +213,7 @@ function rowFrom(e, stats) {
   const pulledFoil = stats.pulledFoil ?? 0;
   const pulled = pulledNormal + pulledFoil;
   const { fullArt, fullArtPath } = fullArtFrom(stats);
+  const collections = [...new Set([...(e.tcg?.tags?.labels ?? []), ...(e.regions ?? [])])];
   return {
     name: e.name,
     kind: e.kind,
@@ -174,7 +221,8 @@ function rowFrom(e, stats) {
     score: e.tcg?.score ?? null,
     foilScore: e.tcg?.foilScore ?? null,
     labels: JSON.stringify(e.tcg?.tags?.labels ?? []),
-    collections: [...new Set([...(e.tcg?.tags?.labels ?? []), ...(e.regions ?? [])])],
+    collections,
+    packs: packsFor(collections),
     tags: e._tags ?? [],
     variants: JSON.stringify(e.tcg?.variants ?? []),
     examine: e.examine ?? null,
@@ -219,6 +267,7 @@ const extraRows = [...circMerged.keys()]
       foilScore: null,
       labels: "[]",
       collections: [],
+      packs: packsFor([]),
       tags: [],
       variants: "[]",
       examine: null,
@@ -343,7 +392,8 @@ db.exec(`
     pull_rate_pct REAL NOT NULL,
     one_in_x REAL,
     full_art INTEGER NOT NULL DEFAULT 0,
-    full_art_path TEXT
+    full_art_path TEXT,
+    packs TEXT NOT NULL DEFAULT '[]'
   );
   CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
   CREATE INDEX idx_cards_rarity ON cards(rarity);
@@ -355,15 +405,15 @@ const insert = db.prepare(`
   INSERT INTO cards (name, kind, rarity, score, foil_score, labels, collections, tags, variants, examine,
                      image_path, wiki, pulled_normal, pulled_foil, pulled,
                      exist_normal, exist_foil, highest_foil_condition,
-                     pull_rate_pct, one_in_x, full_art, full_art_path)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     pull_rate_pct, one_in_x, full_art, full_art_path, packs)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `);
 for (const r of allRows) {
   insert.run(
     r.name, r.kind, r.rarity, r.score, r.foilScore, r.labels, JSON.stringify(r.collections), JSON.stringify(r.tags), r.variants, r.examine,
     r.imagePath, r.wiki, r.pulledNormal, r.pulledFoil, r.pulled,
     r.existNormal, r.existFoil, r.highestFoilCondition,
-    r.pullRatePct, r.oneInX, r.fullArt, r.fullArtPath,
+    r.pullRatePct, r.oneInX, r.fullArt, r.fullArtPath, JSON.stringify(r.packs),
   );
 }
 
@@ -395,10 +445,12 @@ const frontendData = {
   tiers,
   kinds,
   collections,
+  packThumbs,
   cards: allRows.map((r) => ({
     name: r.name,
     kind: r.kind,
     rarity: r.rarity,
+    packs: r.packs,
     pulledNormal: r.pulledNormal,
     pulledFoil: r.pulledFoil,
     pulled: r.pulled,

@@ -98,6 +98,17 @@ try {
 }
 await writeFile(path.join(OUT_DIR, "raw_packs.json"), JSON.stringify(packs, null, 2));
 
+// Pack/collection definitions (shop packs): collection names + thumbnail
+// paths backing the Collections column. Non-fatal: the build renders no
+// collection icons when the file is missing.
+try {
+  const packDefs = await getJson("packs");
+  await writeFile(path.join(OUT_DIR, "raw_packs_catalog.json"), JSON.stringify(packDefs, null, 2));
+  console.log(`packs catalog: ${packDefs.packs?.length ?? 0} packs`);
+} catch (err) {
+  console.log(`packs catalog unavailable (${err.message}) - build will skip collection icons`);
+}
+
 await writeFile(
   path.join(OUT_DIR, "raw_catalog.json"),
   JSON.stringify(catalog, null, 2),
