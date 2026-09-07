@@ -29,8 +29,8 @@ try {
   Push-Location C:\tcg-site
   git add index.html styles.css app.js data.js .github art
   # Regular commits (NOT --amend): amending pins every tip to the same ancient
-  # parent, so GitHub renders each hourly diff as the whole tree. A normal
-  # commit parents onto last hour, making diffs tiny and truthful. Blobs are
+  # parent, so GitHub renders each diff as the whole tree. A normal
+  # commit parents onto the previous run, making diffs tiny and truthful. Blobs are
   # content-hashed either way, so this changes readability, not storage.
   # Fail-closed full-art mirror guard: .gitignore contains art/, and `git add`
   # on an ignored path adds nothing yet exits 0 - then amend+push succeed

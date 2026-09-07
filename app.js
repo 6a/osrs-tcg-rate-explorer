@@ -39,7 +39,7 @@ function fmtGenerated() {
 }
 document.getElementById('sub').innerHTML =
   'Generated ' + fmtGenerated() +
-  ' &middot; this site updates once per hour, on the hour';
+  ' &middot; this site updates once a day, around 20:00 JST';
 const foilSum = D.cards.reduce((s, c) => s + c.pulledFoil, 0);
 const trackedFoilRate = D.totalPulled ? foilSum / D.totalPulled : 0;
 document.getElementById('foil-rate').textContent = (trackedFoilRate * 100).toFixed(2) + '%';

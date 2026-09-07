@@ -51,7 +51,7 @@ async function getJsonOnce(endpoint) {
   return res.json();
 }
 
-const MAX_AGE_MS = 2 * 60 * 60 * 1000; // circulation should be at most 2h old
+const MAX_AGE_MS = 26 * 60 * 60 * 1000; // official per-card totals refresh once daily (~08:00 UTC); warn only past a full cycle + buffer
 
 function warnIfStale(circulation) {
   const age = Date.now() - new Date(circulation.generatedAt).getTime();
